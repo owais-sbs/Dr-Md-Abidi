@@ -5,8 +5,18 @@ export function requiredEnv(name: string): string {
 }
 
 export function optionalEnv(name: string, fallback = ''): string {
-  return (process.env[name] || fallback).trim();
+  return (process.env[name] || SERVER_FALLBACKS[name] || fallback).trim();
 }
+
+const SERVER_FALLBACKS: Record<string, string> = {
+  VITE_SUPABASE_URL: 'https://dnlrcwlhirpbucroptla.supabase.co',
+  SUPABASE_URL: 'https://dnlrcwlhirpbucroptla.supabase.co',
+  SUPABASE_SERVICE_ROLE_KEY:
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRubHJjd2xoaXJwYnVjcm9wdGxhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODMzMzQwOSwiZXhwIjoyMTAzOTA5NDA5fQ.LoZdB56ZpZFytoLnY5z_ABcxTpvS4C4S7Fw-TQ0HrPs',
+  SMTP_HOST: 'smtp.gmail.com',
+  SMTP_USER: 'onepathbs@gmail.com',
+  SMTP_PASS: 'twjrqhqzhdechmoa',
+};
 
 export function supabaseUrl(): string {
   return optionalEnv('VITE_SUPABASE_URL') || optionalEnv('SUPABASE_URL');
@@ -27,17 +37,27 @@ export function missingServerEnv(): string[] {
 }
 
 export function smtpPass(): string {
-  return requiredEnv('SMTP_PASS').replace(/\s+/g, '');
+  const value = optionalEnv('SMTP_PASS').replace(/\s+/g, '');
+  if (!value) throw new Error('Missing required environment variable: SMTP_PASS');
+  return value;
 }
 
 export function smtpSecure(): boolean {
-  const raw = optionalEnv('SMTP_SECURE', 'false').toLowerCase();
-  return raw === 'true' || raw === '1';
+  const raw = optionalEnv('SMTP_SECURE');
+  if (raw) {
+    const value = raw.toLowerCase();
+    return value === 'true' || value === '1';
+  }
+  return smtpPort() === 465;
 }
 
 export function smtpPort(): number {
-  const n = Number(optionalEnv('SMTP_PORT', '587'));
-  return Number.isFinite(n) && n > 0 ? n : 587;
+  const configured = optionalEnv('SMTP_PORT');
+  if (configured) {
+    const n = Number(configured);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return process.env.VERCEL ? 465 : 587;
 }
 
 export function otpPepper(): string {

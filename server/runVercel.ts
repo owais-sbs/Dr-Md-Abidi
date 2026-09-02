@@ -21,7 +21,12 @@ export async function runVercel(req: VercelReq, res: VercelRes, fn: (body: unkno
     const result = await fn(body ?? {});
     res.status(result.status).json(result.body);
   } catch (err) {
-    console.error('[api]', err instanceof Error ? err.message : err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[api]', message);
+    if (/smtp|econnection|etimedout|esocket|eauth|invalid login|authentication|greeting never received|could not send email/i.test(message)) {
+      res.status(502).json({ error: 'We could not send the verification email. Please try again in a moment.' });
+      return;
+    }
     res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 }
