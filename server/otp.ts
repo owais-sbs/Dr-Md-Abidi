@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
-import { otpPepper } from './env';
+import { otpPepper, missingServerEnv } from './env';
 import { sendMail } from './mail';
 import { otpEmail } from './templates';
 import { supabaseAdmin } from './supabaseAdmin';
@@ -43,6 +43,12 @@ async function countRecent(table: 'email_otps', column: 'email' | 'ip', value: s
 }
 
 export async function handleOtpSend(body: unknown, ip: string): Promise<ApiResult> {
+  const missing = missingServerEnv();
+  if (missing.length) {
+    console.error('[otp] missing env:', missing.join(', '));
+    return fail('Email sending is not configured on the live server. Add SMTP and Supabase keys in Vercel Environment Variables, then redeploy.', 503);
+  }
+
   const payload = (body || {}) as Record<string, unknown>;
   const email = normalizeEmail(payload.email);
   if (!email) return fail('Please enter a valid email address.');

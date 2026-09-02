@@ -8,13 +8,17 @@ type VercelReq = {
 };
 type VercelRes = { status: (n: number) => { json: (b: unknown) => void } };
 
-export async function runVercel(req: VercelReq, res: VercelRes, fn: () => Promise<ApiResult>): Promise<void> {
+export async function runVercel(req: VercelReq, res: VercelRes, fn: (body: unknown) => Promise<ApiResult>): Promise<void> {
   try {
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'Method not allowed.' });
       return;
     }
-    const result = await fn();
+    let body: unknown = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = {}; }
+    }
+    const result = await fn(body ?? {});
     res.status(result.status).json(result.body);
   } catch (err) {
     console.error('[api]', err instanceof Error ? err.message : err);

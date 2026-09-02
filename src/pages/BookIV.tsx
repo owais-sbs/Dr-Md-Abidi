@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -162,6 +162,11 @@ export function BookIV() {
   const [verificationToken, setVerificationToken] = useState(() => {
     try { return sessionStorage.getItem('iv-verify-token') || ''; } catch { return ''; }
   });
+  const stepCardRef = useRef<HTMLDivElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const otpInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [guideEmail, setGuideEmail] = useState(false);
 
   // Step 3 — medical intake form (exact form from spec)
   const [form, setForm] = useState({
@@ -218,6 +223,30 @@ export function BookIV() {
         : [...p.conditions, c],
     }));
   }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const header = document.getElementById('site-header');
+      const offset = (header?.offsetHeight || 104) + 16;
+      let target: HTMLElement | null = null;
+      if (step === 2) target = otpSent ? otpInputRef.current : emailInputRef.current;
+      else if (step === 3) target = nameInputRef.current;
+      if (!target) target = stepCardRef.current;
+      if (!target) return;
+      const top = target.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      if (step === 2 && !otpSent) {
+        emailInputRef.current?.focus({ preventScroll: true });
+        setGuideEmail(true);
+        window.setTimeout(() => setGuideEmail(false), 2200);
+      } else if (step === 2 && otpSent) {
+        otpInputRef.current?.focus({ preventScroll: true });
+      } else if (step === 3) {
+        nameInputRef.current?.focus({ preventScroll: true });
+      }
+    }, 360);
+    return () => window.clearTimeout(timer);
+  }, [step, otpSent]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -364,7 +393,7 @@ export function BookIV() {
               <Sidebar current={step} />
 
               {/* Main card */}
-              <div className="flex-1 min-w-0">
+              <div ref={stepCardRef} className="flex-1 min-w-0 scroll-mt-36">
                 <MobileSteps current={step} />
                 <AnimatePresence mode="wait">
 
@@ -470,8 +499,12 @@ export function BookIV() {
                           <div>
                             <label className="block text-xs font-semibold text-ink-700 mb-1.5">Email Address <span className="text-red-400">*</span></label>
                             <div className="flex gap-2">
-                              <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (otpSent) resetOtp(); }} placeholder="your@email.com"
-                                className="flex-1 border-2 border-ink-200 focus:border-primary-900 rounded-xl px-4 py-3 text-sm outline-none transition-colors"
+                              <input ref={emailInputRef} type="email" value={email} onChange={e => { setEmail(e.target.value); if (otpSent) resetOtp(); }} placeholder="your@email.com"
+                                className={`flex-1 border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all duration-500 ${
+                                  guideEmail
+                                    ? 'border-orange-500 ring-4 ring-orange-400/40 bg-orange-50/40'
+                                    : 'border-ink-200 focus:border-primary-900'
+                                }`}
                                 disabled={otpSent && !verificationToken} />
                               <button onClick={handleSendOtp} disabled={sendingOtp || (otpSent && resendIn > 0)}
                                 className="inline-flex items-center gap-1.5 bg-primary-900 hover:bg-primary-800 disabled:opacity-50 text-white font-semibold text-xs px-4 py-3 rounded-xl transition-all whitespace-nowrap">
@@ -495,7 +528,7 @@ export function BookIV() {
                           {otpSent && (
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                               <label className="block text-xs font-semibold text-ink-700 mb-1.5">Enter the 6-digit code</label>
-                              <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              <input ref={otpInputRef} type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                 placeholder="_ _ _ _ _ _" maxLength={6}
                                 className="w-full border-2 border-ink-200 focus:border-primary-900 rounded-xl px-4 py-3 text-sm outline-none transition-colors tracking-[0.5em] text-center font-bold text-2xl" />
                               {otpError && <p className="text-xs text-red-500 mt-1.5">{otpError}</p>}
@@ -562,7 +595,7 @@ export function BookIV() {
                             <div className="grid sm:grid-cols-2 gap-5">
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Full Name <span className="text-red-400">*</span></label>
-                                <input required type="text" value={form.name} onChange={e => setF('name', e.target.value)} placeholder="First Last" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
+                                <input ref={nameInputRef} required type="text" value={form.name} onChange={e => setF('name', e.target.value)} placeholder="First Last" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
                               </div>
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Phone Number <span className="text-red-400">*</span></label>

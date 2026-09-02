@@ -45,7 +45,7 @@ function PublicLayout() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Fixed header — always on top across all pages */}
-      <div ref={headerRef} className="fixed top-0 left-0 right-0 z-50 w-full bg-white shadow-sm">
+      <div ref={headerRef} id="site-header" className="fixed top-0 left-0 right-0 z-50 w-full bg-white shadow-sm">
         <TopBar />
         <Header />
       </div>

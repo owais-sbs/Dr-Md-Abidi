@@ -8,6 +8,24 @@ export function optionalEnv(name: string, fallback = ''): string {
   return (process.env[name] || fallback).trim();
 }
 
+export function supabaseUrl(): string {
+  return optionalEnv('VITE_SUPABASE_URL') || optionalEnv('SUPABASE_URL');
+}
+
+export function supabaseServiceKey(): string {
+  return optionalEnv('SUPABASE_SERVICE_ROLE_KEY');
+}
+
+export function missingServerEnv(): string[] {
+  const missing: string[] = [];
+  if (!supabaseUrl()) missing.push('VITE_SUPABASE_URL');
+  if (!supabaseServiceKey()) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!optionalEnv('SMTP_HOST')) missing.push('SMTP_HOST');
+  if (!optionalEnv('SMTP_USER')) missing.push('SMTP_USER');
+  if (!optionalEnv('SMTP_PASS')) missing.push('SMTP_PASS');
+  return missing;
+}
+
 export function smtpPass(): string {
   return requiredEnv('SMTP_PASS').replace(/\s+/g, '');
 }
@@ -23,7 +41,7 @@ export function smtpPort(): number {
 }
 
 export function otpPepper(): string {
-  return optionalEnv('OTP_PEPPER') || requiredEnv('SUPABASE_SERVICE_ROLE_KEY');
+  return optionalEnv('OTP_PEPPER') || supabaseServiceKey() || 'otp-dev-pepper';
 }
 
 export function publicAppUrl(): string {

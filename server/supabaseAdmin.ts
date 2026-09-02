@@ -1,11 +1,16 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { requiredEnv } from './env';
+import { supabaseServiceKey, supabaseUrl } from './env';
 
 let admin: SupabaseClient | null = null;
 
 export function supabaseAdmin(): SupabaseClient {
   if (admin) return admin;
-  admin = createClient(requiredEnv('VITE_SUPABASE_URL'), requiredEnv('SUPABASE_SERVICE_ROLE_KEY'), {
+  const url = supabaseUrl();
+  const key = supabaseServiceKey();
+  if (!url || !key) {
+    throw new Error('Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+  admin = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return admin;
