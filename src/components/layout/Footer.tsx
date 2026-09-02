@@ -1,11 +1,17 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Clock, Mail, MapPin, Phone } from 'lucide-react';
-import { footerPages, footerTreatments } from '@/data/navigation';
+import { footerPages } from '@/data/navigation';
 import { site } from '@/data/site';
+import { useLiveNav } from '@/lib/liveNav';
 import { staggerContainer, staggerFast, fadeUp, slideRight, viewport } from '@/animations/variants';
 
 export function Footer() {
+  const nav = useLiveNav();
+  const treatments = [
+    ...(nav.find(i => i.href === '/conditions-we-treat/')?.children || []).slice(0, 4),
+    { label: 'View All Treatments', href: '/conditions-we-treat/' },
+  ];
   return (
     <footer className="bg-primary-900 text-sky-100">
       <div className="container-page py-12 sm:py-14">
@@ -57,8 +63,8 @@ export function Footer() {
           <motion.div variants={fadeUp}>
             <h4 className="text-white text-xs font-bold uppercase tracking-widest mb-4">Treatments</h4>
             <ul className="space-y-2.5 text-sm">
-              {footerTreatments.map((p) => (
-                <li key={p.href}>
+              {treatments.map((p) => (
+                <li key={`${p.href}-${p.label}`}>
                   <Link to={p.href} className="text-sky-200/70 hover:text-orange-400 transition-colors">{p.label}</Link>
                 </li>
               ))}

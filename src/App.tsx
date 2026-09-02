@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useParams } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { Header } from '@/components/layout/Header';
@@ -15,22 +15,20 @@ import { Contact } from '@/pages/Contact';
 import { Disclaimer } from '@/pages/Disclaimer';
 import { PrivacyPolicy } from '@/pages/PrivacyPolicy';
 import { IVPackages } from '@/pages/IVPackages';
-import { Saline } from '@/pages/iv/Saline';
-import { TheMyers } from '@/pages/iv/TheMyers';
-import { TheAfterParty } from '@/pages/iv/TheAfterParty';
-import { MTO } from '@/pages/iv/MTO';
-import { GoWithTheFlow } from '@/pages/iv/GoWithTheFlow';
-import { TheMigraineMinimizer } from '@/pages/iv/TheMigraineMinimizer';
-import { TheDefensiveLine } from '@/pages/iv/TheDefensiveLine';
-import { TheKitchenSink } from '@/pages/iv/TheKitchenSink';
-import { TheGrenade } from '@/pages/iv/TheGrenade';
 import { BookIV } from '@/pages/BookIV';
 import { AdminDashboard } from '@/pages/AdminDashboard';
-import { CmsConditionDetail } from '@/pages/CmsConditionDetail';
-import { CmsIVPackageDetail } from '@/pages/CmsIVPackageDetail';
+import { IVPackageRoute } from '@/pages/IVPackageRoute';
+import { PublicSlugPage } from '@/pages/PublicSlugPage';
 import { NotFound } from '@/pages/NotFound';
 
-// Layout wrapper — renders header/footer for all public routes
+function RedirectIvCms() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/iv-packages/${slug}/`} replace />;
+}
+function RedirectConditionCms() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/${slug}/`} replace />;
+}
 function PublicLayout() {
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerH, setHeaderH] = useState(104);
@@ -67,7 +65,8 @@ function App() {
       <ScrollToTop />
       <Routes>
         {/* Admin — no header/footer */}
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
+        <Route path="/admin/:page" element={<AdminDashboard />} />
 
         {/* Public site — wrapped with header/footer */}
         <Route element={<PublicLayout />}>
@@ -84,24 +83,17 @@ function App() {
           <Route path="/spondyloarthritis/" element={<ConditionDetail slug="spondyloarthritis" />} />
           <Route path="/gout/" element={<ConditionDetail slug="gout" />} />
           <Route path="/iv-packages/" element={<IVPackages />} />
-          <Route path="/iv-packages/saline/" element={<Saline />} />
-          <Route path="/iv-packages/the-myers/" element={<TheMyers />} />
-          <Route path="/iv-packages/the-after-party/" element={<TheAfterParty />} />
-          <Route path="/iv-packages/mto/" element={<MTO />} />
-          <Route path="/iv-packages/go-with-the-flow/" element={<GoWithTheFlow />} />
-          <Route path="/iv-packages/the-migraine-minimizer/" element={<TheMigraineMinimizer />} />
-          <Route path="/iv-packages/the-defensive-line/" element={<TheDefensiveLine />} />
-          <Route path="/iv-packages/the-kitchen-sink/" element={<TheKitchenSink />} />
-          <Route path="/iv-packages/the-grenade/" element={<TheGrenade />} />
+          <Route path="/iv-packages/cms/:slug/" element={<RedirectIvCms />} />
+          <Route path="/iv-packages/:slug/" element={<IVPackageRoute />} />
           <Route path="/book-iv/" element={<BookIV />} />
-          <Route path="/iv-packages/cms/:slug/" element={<CmsIVPackageDetail />} />
-          <Route path="/cms-condition/:slug/" element={<CmsConditionDetail />} />
+          <Route path="/cms-condition/:slug/" element={<RedirectConditionCms />} />
           <Route path="/happy-patients/" element={<HappyPatients />} />
           <Route path="/blog/" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="/contact-us/" element={<Contact />} />
           <Route path="/disclaimer/" element={<Disclaimer />} />
           <Route path="/privacy-policy/" element={<PrivacyPolicy />} />
+          <Route path="/:slug/" element={<PublicSlugPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

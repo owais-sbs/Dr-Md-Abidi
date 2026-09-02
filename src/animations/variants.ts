@@ -89,7 +89,7 @@ export const viewport = { once: true, amount: 0.18 } as const;
 
 export const hoverLift = {
   y: -8,
-  transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+  transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const },
 };
 
 export const hoverCardShadow = {

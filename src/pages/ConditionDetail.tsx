@@ -6,29 +6,27 @@ import { ConditionContent } from '@/components/conditions/ConditionContent';
 import { RelatedConditions } from '@/components/conditions/RelatedConditions';
 import { CTASection } from '@/components/common/CTASection';
 import { getCondition, conditions, type Condition } from '@/data/conditions';
-import { getCmsConditions } from '@/data/cms';
+import { getCmsConditions, type CmsCondition } from '@/data/cms';
+import { useCmsRealtime } from '@/lib/cmsLive';
 
 export function ConditionDetail({ slug: slugProp }: { slug?: string }) {
   const { slug: slugParam } = useParams<{ slug: string }>();
   const slug = slugProp ?? slugParam;
   const base = slug ? getCondition(slug) : undefined;
 
-  // Read CMS override for this slug (stored as static-cond-{slug})
-  const [ov, setOv] = useState(() =>
-    getCmsConditions().find(c => c.id === `static-cond-${slug}`)
-  );
+  const [ov, setOv] = useState<CmsCondition | undefined>();
+
+  const loadOverride = () => {
+    getCmsConditions().then(list => {
+      setOv(list.find(c => c.id === `static-cond-${slug}`));
+    }).catch(() => setOv(undefined));
+  };
 
   useEffect(() => {
-    function reload() {
-      setOv(getCmsConditions().find(c => c.id === `static-cond-${slug}`));
-    }
-    window.addEventListener('storage', reload);
-    window.addEventListener('focus', reload);
-    return () => {
-      window.removeEventListener('storage', reload);
-      window.removeEventListener('focus', reload);
-    };
+    loadOverride();
   }, [slug]);
+
+  useCmsRealtime(loadOverride);
 
   if (!base) return <Navigate to="/conditions-we-treat/" replace />;
 

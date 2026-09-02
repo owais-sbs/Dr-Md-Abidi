@@ -7,10 +7,11 @@ import {
 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import {
-  IV_PACKAGES, getAvailableDates, TIME_SLOTS, getAvailableTimesForSlot,
-  saveAppointment, generateId, type Appointment,
+  IV_PACKAGES, getAvailableDates, getAvailableTimesForSlot,
 } from '@/data/appointments';
 import { getCmsIVPackages } from '@/data/cms';
+import { supabase } from '@/lib/supabase';
+import { createBookingRequest, sendBookingOtp, verifyBookingOtp } from '@/lib/bookingApi';
 
 /* ─────────────────────────────────────────────
    STEP SIDEBAR
@@ -58,7 +59,7 @@ function Sidebar({ current }: { current: number }) {
         </div>
         <div className="mt-2 pt-4 border-t border-white/10 text-xs text-sky-300 leading-relaxed">
           <Shield className="w-3.5 h-3.5 inline mr-1 text-sky-400" />
-          OTP is sent to your email. For demo purposes, it is displayed on screen.
+          We'll email a 6-digit code to verify your address.
         </div>
       </div>
     </aside>
@@ -92,21 +93,49 @@ export function BookIV() {
   const navigate  = useNavigate();
   const preselected = params.get('package') || '';
 
-  // Merge static + CMS packages — reload on focus
   const [allPackages, setAllPackages] = useState(IV_PACKAGES);
+  const [dates, setDates] = useState<{ date: string; location: 'Freehold' | 'Brick' }[]>([]);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [submitError, setSubmitError] = useState('');
 
-  function loadPackages() {
-    const cms = getCmsIVPackages().filter(p => p.enabled).map(p => ({ name: p.name, slug: p.slug, price: p.price }));
-    setAllPackages([...IV_PACKAGES, ...cms]);
+  async function loadPackages() {
+    try {
+      const all = await getCmsIVPackages();
+      const cms = all
+        .filter(p => p.enabled && !p.id.startsWith('static-pkg-'))
+        .map(p => ({ name: p.name, slug: p.slug, price: p.price }));
+      const overrides = all.filter(p => p.enabled && p.id.startsWith('static-pkg-'));
+      const merged = IV_PACKAGES.map(p => {
+        const ov = overrides.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
+        return ov ? { name: ov.name || p.name, slug: ov.slug || p.slug, price: ov.price || p.price } : p;
+      });
+      setAllPackages([...merged, ...cms]);
+    } catch {
+      setAllPackages(IV_PACKAGES);
+    }
+  }
+
+  async function loadDates() {
+    try {
+      setDates(await getAvailableDates());
+    } catch {
+      setDates([]);
+    }
   }
 
   useEffect(() => {
     loadPackages();
-    window.addEventListener('focus', loadPackages);
-    window.addEventListener('storage', loadPackages);
+    loadDates();
+    const channel = supabase
+      .channel('booking-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_configs' }, () => { loadDates(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_iv_packages' }, () => { loadPackages(); })
+      .subscribe();
+    const onFocus = () => { loadDates(); loadPackages(); };
+    window.addEventListener('focus', onFocus);
     return () => {
-      window.removeEventListener('focus', loadPackages);
-      window.removeEventListener('storage', loadPackages);
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
 
@@ -116,18 +145,23 @@ export function BookIV() {
   const [selectedPkg, setSelectedPkg] = useState(preselected);
 
   // Step 1 — slot
-  const dates = getAvailableDates();
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
 
   // Step 2 — OTP
-  const [email, setEmail]           = useState('');
+  const [email, setEmail]           = useState(() => {
+    try { return sessionStorage.getItem('iv-verify-email') || ''; } catch { return ''; }
+  });
   const [otp, setOtp]               = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState('');
   const [otpSent, setOtpSent]       = useState(false);
-  const [otpVisible, setOtpVisible] = useState(false);   // stays on screen
   const [otpError, setOtpError]     = useState('');
+  const [otpInfo, setOtpInfo]       = useState('');
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendIn, setResendIn]     = useState(0);
+  const [verificationToken, setVerificationToken] = useState(() => {
+    try { return sessionStorage.getItem('iv-verify-token') || ''; } catch { return ''; }
+  });
 
   // Step 3 — medical intake form (exact form from spec)
   const [form, setForm] = useState({
@@ -156,6 +190,18 @@ export function BookIV() {
   const pkgObj  = allPackages.find(p => p.slug === selectedPkg);
   const slotObj = dates.find(d => d.date === selectedDate);
 
+  useEffect(() => {
+    if (!selectedDate || !slotObj) {
+      setAvailableTimes([]);
+      return;
+    }
+    let alive = true;
+    getAvailableTimesForSlot(selectedDate, slotObj.location)
+      .then(times => { if (alive) setAvailableTimes(times); })
+      .catch(() => { if (alive) setAvailableTimes([]); });
+    return () => { alive = false; };
+  }, [selectedDate, slotObj?.location]);
+
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   }
@@ -173,60 +219,113 @@ export function BookIV() {
     }));
   }
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = window.setTimeout(() => setResendIn(v => Math.max(0, v - 1)), 1000);
+    return () => window.clearTimeout(t);
+  }, [resendIn]);
+
+  function resetOtp() {
+    setOtpSent(false);
+    setOtp('');
+    setOtpError('');
+    setOtpInfo('');
+    setVerificationToken('');
+    setResendIn(0);
+    try { sessionStorage.removeItem('iv-verify-token'); sessionStorage.removeItem('iv-verify-email'); } catch { /* ignore */ }
+  }
+
   // OTP send
-  function handleSendOtp() {
+  async function handleSendOtp() {
     if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       setOtpError('Please enter a valid email address.'); return;
     }
     setSendingOtp(true);
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(code);
-    setTimeout(() => {
-      setSendingOtp(false);
+    setOtpError('');
+    try {
+      const result = await sendBookingOtp(email);
       setOtpSent(true);
-      setOtpVisible(true);   // stays visible on screen
-      setOtpError('');
-      console.log(`OTP for ${email}: ${code}`);
-    }, 900);
+      setOtpInfo(result.message || `A 6-digit code was sent to ${email}.`);
+      setResendIn(result.retryAfterSeconds || 60);
+      setVerificationToken('');
+      setOtp('');
+    } catch (err) {
+      setOtpError(err instanceof Error ? err.message : 'Could not send the verification code.');
+    } finally {
+      setSendingOtp(false);
+    }
   }
 
-  function handleVerifyOtp() {
-    if (otp === generatedOtp) { setOtpError(''); setStep(3); }
-    else setOtpError('Incorrect OTP. Please try again.');
+  async function handleVerifyOtp() {
+    setVerifyingOtp(true);
+    setOtpError('');
+    try {
+      const result = await verifyBookingOtp(email, otp);
+      setVerificationToken(result.verificationToken);
+      try {
+        sessionStorage.setItem('iv-verify-token', result.verificationToken);
+        sessionStorage.setItem('iv-verify-email', result.email || email);
+      } catch { /* ignore */ }
+      setOtpInfo('Email verified. Continue to the medical form.');
+      setStep(3);
+    } catch (err) {
+      setOtpError(err instanceof Error ? err.message : 'Could not verify the code.');
+    } finally {
+      setVerifyingOtp(false);
+    }
   }
 
-  // submit
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    const appt: Appointment = {
-      id: generateId(),
-      packageName: pkgObj?.name || '',
-      packageSlug: selectedPkg,
-      location: slotObj?.location || 'Freehold',
-      date: selectedDate,
-      time: selectedTime,
-      email,
-      firstName: form.name.split(' ')[0] || '',
-      lastName:  form.name.split(' ').slice(1).join(' ') || '',
-      phone:     form.phone,
-      dob:       form.dob,
-      gender:    form.gender,
-      address:   '',
-      insuranceName: '',
-      allergies: form.allergies,
-      medications: form.medications,
-      medicalHistory: form.conditions.join(', '),
-      reasonForVisit: form.treatmentGoal,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-    setTimeout(() => {
-      saveAppointment(appt);
-      setSavedId(appt.id);
+    setSubmitError('');
+    let tokenFromStore = '';
+    try { tokenFromStore = sessionStorage.getItem('iv-verify-token') || ''; } catch { tokenFromStore = ''; }
+    const token = verificationToken || tokenFromStore;
+    if (!token) {
+      setSubmitError('Please verify your email before submitting.');
+      setStep(2);
       setSubmitting(false);
+      return;
+    }
+    const names = form.name.trim().split(/\s+/);
+    try {
+      const result = await createBookingRequest({
+        verificationToken: token,
+        email,
+        packageName: pkgObj?.name || '',
+        packageSlug: selectedPkg,
+        location: slotObj?.location || 'Freehold',
+        date: selectedDate,
+        time: selectedTime,
+        firstName: names[0] || '',
+        lastName: names.slice(1).join(' '),
+        phone: form.phone,
+        dob: form.dob,
+        gender: form.gender,
+        allergies: form.allergies,
+        medications: form.medications,
+        medicalHistory: form.conditions.join(', '),
+        reasonForVisit: form.treatmentGoal,
+        intake: {
+          priorIV: form.priorIV,
+          priorIVDetail: form.priorIVDetail,
+          priorIVProblems: form.priorIVProblems,
+          dialysis: form.dialysis,
+          digoxin: form.digoxin,
+          africanDescentG6PD: form.africanDescentG6PD,
+          decreasedGFR: form.decreasedGFR,
+          decreasedGFRDetail: form.decreasedGFRDetail,
+        },
+      });
+      setSavedId(result.id);
+      try { sessionStorage.removeItem('iv-verify-token'); sessionStorage.removeItem('iv-verify-email'); } catch { /* ignore */ }
       setStep(4);
-    }, 800);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Could not submit your booking. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const CONDITIONS = [
@@ -333,7 +432,9 @@ export function BookIV() {
                           <div>
                             <div className="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-3"><Clock className="w-4 h-4 text-sky-400" /> Select a time</div>
                             <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                              {getAvailableTimesForSlot(selectedDate, slotObj?.location || 'Freehold').map(t => (
+                              {availableTimes.length === 0 ? (
+                                <p className="col-span-4 text-sm text-ink-400">No times left for this date. Please pick another day.</p>
+                              ) : availableTimes.map(t => (
                                 <button key={t} type="button" onClick={() => setSelectedTime(t)}
                                   className={`rounded-lg border-2 py-2 text-xs font-semibold transition-all ${selectedTime === t ? 'border-primary-900 bg-primary-900 text-white' : 'border-ink-100 hover:border-primary-300 text-ink-700'}`}>
                                   {t}
@@ -363,29 +464,31 @@ export function BookIV() {
                           <Mail className="w-7 h-7 text-sky-500" />
                         </div>
                         <h2 className="text-xl font-serif font-bold text-ink-900 text-center mb-1">Verify Your Email</h2>
-                        <p className="text-sm text-ink-500 text-center mb-6">Enter your email to receive a 6-digit verification code</p>
+                        <p className="text-sm text-ink-500 text-center mb-6">We'll send a 6-digit code to the email you enter below</p>
 
                         <div className="max-w-md mx-auto space-y-4">
                           <div>
                             <label className="block text-xs font-semibold text-ink-700 mb-1.5">Email Address <span className="text-red-400">*</span></label>
                             <div className="flex gap-2">
-                              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com"
+                              <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (otpSent) resetOtp(); }} placeholder="your@email.com"
                                 className="flex-1 border-2 border-ink-200 focus:border-primary-900 rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-                                disabled={otpSent} />
-                              <button onClick={handleSendOtp} disabled={sendingOtp || otpSent}
+                                disabled={otpSent && !verificationToken} />
+                              <button onClick={handleSendOtp} disabled={sendingOtp || (otpSent && resendIn > 0)}
                                 className="inline-flex items-center gap-1.5 bg-primary-900 hover:bg-primary-800 disabled:opacity-50 text-white font-semibold text-xs px-4 py-3 rounded-xl transition-all whitespace-nowrap">
-                                {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : otpSent ? 'Sent ✓' : 'Send OTP'}
+                                {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : otpSent ? (resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend OTP') : 'Send OTP'}
                               </button>
                             </div>
                           </div>
 
-                          {/* OTP display box — stays visible */}
-                          {otpVisible && (
+                          {otpSent && (
                             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                               className="bg-sky-50 border-2 border-sky-200 rounded-xl p-4 text-center">
-                              <p className="text-xs text-sky-600 font-semibold uppercase tracking-wider mb-2">Your One-Time Password</p>
-                              <p className="text-4xl font-black text-primary-900 tracking-[0.3em]">{generatedOtp}</p>
-                              <p className="text-xs text-sky-500 mt-2">In production this is emailed to <strong>{email}</strong></p>
+                              <p className="text-xs text-sky-600 font-semibold uppercase tracking-wider mb-1">Check your inbox</p>
+                              <p className="text-sm text-sky-800">{otpInfo || `A verification code was sent to ${email}.`}</p>
+                              <p className="text-xs text-sky-500 mt-2">The code expires in 10 minutes and can be used only once. Check spam if you don't see it.</p>
+                              <button type="button" onClick={resetOtp} className="mt-2 text-xs font-semibold text-primary-800 underline">
+                                Use a different email
+                              </button>
                             </motion.div>
                           )}
 
@@ -398,6 +501,7 @@ export function BookIV() {
                               {otpError && <p className="text-xs text-red-500 mt-1.5">{otpError}</p>}
                             </motion.div>
                           )}
+                          {!otpSent && otpError && <p className="text-xs text-red-500">{otpError}</p>}
                         </div>
 
                         <div className="flex gap-3 mt-6 max-w-md mx-auto">
@@ -405,9 +509,9 @@ export function BookIV() {
                             <ArrowLeft className="w-4 h-4" /> Back
                           </button>
                           {otpSent && (
-                            <button onClick={handleVerifyOtp} disabled={otp.length !== 6}
+                            <button onClick={handleVerifyOtp} disabled={otp.length !== 6 || verifyingOtp}
                               className="flex-[2] inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-3.5 rounded-full transition-all text-sm">
-                              Verify & Continue <ChevronRight className="w-4 h-4" />
+                              {verifyingOtp ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : <>Verify & Continue <ChevronRight className="w-4 h-4" /></>}
                             </button>
                           )}
                         </div>
@@ -420,7 +524,7 @@ export function BookIV() {
                     <motion.div key="s3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
                       <form onSubmit={handleSubmit}>
                         {/* Booking summary strip */}
-                        <div className="bg-primary-900 text-white rounded-2xl px-6 py-4 mb-5 grid sm:grid-cols-3 gap-3 text-sm">
+                        <div className="bg-primary-900 text-white rounded-2xl px-6 py-4 mb-5 grid sm:grid-cols-4 gap-3 text-sm">
                           <div className="flex items-start gap-2">
                             <CheckCircle2 className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
                             <div><div className="text-xs text-sky-300">Package</div><div className="font-bold">{pkgObj?.name} — ${pkgObj?.price}</div></div>
@@ -432,6 +536,10 @@ export function BookIV() {
                           <div className="flex items-start gap-2">
                             <MapPin className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
                             <div><div className="text-xs text-sky-300">Location · Time</div><div className="font-bold">{slotObj?.location} · {selectedTime}</div></div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <Mail className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
+                            <div><div className="text-xs text-sky-300">Verified email</div><div className="font-bold break-all">{email}</div></div>
                           </div>
                         </div>
 
@@ -580,8 +688,12 @@ export function BookIV() {
 
                             {/* ── Disclaimer ── */}
                             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 leading-relaxed">
-                              <strong>Please note:</strong> This is a <strong>booking request</strong>, not a confirmed appointment. Dr. Abidi will review your medical history form and confirm or decline your appointment. You will receive an email once a decision is made.
+                              <strong>Please note:</strong> This is a <strong>booking request</strong>, not a confirmed appointment. Dr. Abidi will review your medical history form and approve or decline it in the admin portal. Approved times appear on the clinic calendar.
                             </div>
+
+                            {submitError && (
+                              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{submitError}</div>
+                            )}
 
                             {/* ── Submit ── */}
                             <div className="flex gap-3 pt-2">

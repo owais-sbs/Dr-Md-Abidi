@@ -1,17 +1,36 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CalendarDays, Phone, CheckCircle2, ArrowRight } from 'lucide-react';
+import { CalendarDays, Phone, CheckCircle2, Loader2 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { CTASection } from '@/components/common/CTASection';
 import { Breadcrumbs } from '@/components/common/Breadcrumbs';
-import { getCmsConditions } from '@/data/cms';
+import { getCmsConditions, type CmsCondition } from '@/data/cms';
 import { fadeUp, staggerContainer, viewport } from '@/animations/variants';
 import { site } from '@/data/site';
 
 export function CmsConditionDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const condition = getCmsConditions().find(c => c.slug === slug && c.enabled);
+  const [condition, setCondition] = useState<CmsCondition | null | undefined>(undefined);
 
+  useEffect(() => {
+    let alive = true;
+    getCmsConditions()
+      .then(list => {
+        if (!alive) return;
+        setCondition(list.find(c => c.slug === slug && c.enabled && !c.id.startsWith('static-cond-')) || null);
+      })
+      .catch(() => { if (alive) setCondition(null); });
+    return () => { alive = false; };
+  }, [slug]);
+
+  if (condition === undefined) {
+    return (
+      <div className="min-h-[40vh] grid place-items-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-900" />
+      </div>
+    );
+  }
   if (!condition) return <Navigate to="/conditions-we-treat/" replace />;
 
   const symptoms = condition.symptoms ? condition.symptoms.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -26,7 +45,6 @@ export function CmsConditionDetail() {
 
       <Breadcrumbs items={[{ label: 'Conditions We Treat', href: '/conditions-we-treat/' }, { label: condition.title }]} />
 
-      {/* Hero */}
       <section className="relative overflow-hidden bg-primary-900 text-white">
         {condition.heroImage && (
           <div className="absolute inset-0 opacity-25"
@@ -58,7 +76,6 @@ export function CmsConditionDetail() {
         </div>
       </section>
 
-      {/* Overview */}
       {paragraphs.length > 0 && (
         <section className="bg-white">
           <div className="container-page py-14">
@@ -74,7 +91,6 @@ export function CmsConditionDetail() {
         </section>
       )}
 
-      {/* Symptoms */}
       {symptoms.length > 0 && (
         <section className="bg-ink-50">
           <div className="container-page py-14">
@@ -91,7 +107,6 @@ export function CmsConditionDetail() {
         </section>
       )}
 
-      {/* Treatment */}
       {condition.treatmentIntro && (
         <section className="bg-white">
           <div className="container-page py-14">

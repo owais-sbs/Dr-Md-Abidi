@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, CalendarDays, CheckCircle2, Clock, PauseCircle,
@@ -6,16 +7,16 @@ import {
   LogOut, Syringe, FileText, Search, MapPin, Mail, MessageSquare,
   Phone, TrendingUp, ArrowUpRight, Inbox, Activity, Plus, Pencil,
   Trash2, ToggleLeft, ToggleRight, Save, AlertCircle, Lock, Unlock,
-  ChevronLeft, ChevronRight, List, CalendarRange, StickyNote,
+  ChevronLeft, ChevronRight, List, CalendarRange, StickyNote, Loader2,
 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import {
-  getAppointments, updateAppointment, updateAppointmentStatus,
+  getAppointments, updateAppointment,
   getContactMessages, updateContactStatus,
-  getSlotConfig, saveSlotConfig,
+  getSlotConfigs, saveSlotConfig,
   TIME_SLOTS,
   type Appointment, type AppointmentStatus,
-  type ContactMessage, type ContactStatus,
+  type ContactMessage, type ContactStatus, type SlotConfig,
 } from '@/data/appointments';
 import {
   getCmsConditions, saveCmsCondition, deleteCmsCondition,
@@ -26,9 +27,17 @@ import {
 import { conditions as staticConditions } from '@/data/conditions';
 import { IV_PACKAGES as staticIVPackages } from '@/data/appointments';
 import { site } from '@/data/site';
+import { supabase } from '@/lib/supabase';
+import { AdminLogin } from '@/pages/AdminLogin';
+import { clinicForDate } from '@/lib/cmsLive';
+import { reviewBooking } from '@/lib/bookingApi';
 
 /* ─── Types ─────────────────────────────── */
 type NavPage = 'overview' | 'appointments' | 'calendar' | 'slots' | 'messages' | 'conditions' | 'iv-packages';
+const NAV_PAGES: NavPage[] = ['overview', 'appointments', 'calendar', 'slots', 'messages', 'conditions', 'iv-packages'];
+function isNavPage(v: string | undefined): v is NavPage {
+  return !!v && (NAV_PAGES as string[]).includes(v);
+}
 
 /* ─── Status config ─────────────────────── */
 const APPT_STATUS: Record<AppointmentStatus, { label: string; dot: string; text: string; bg: string; border: string; icon: React.ElementType }> = {
@@ -37,6 +46,7 @@ const APPT_STATUS: Record<AppointmentStatus, { label: string; dot: string; text:
   hold:      { label: 'On Hold',   dot: 'bg-blue-500',   text: 'text-blue-600',   bg: 'bg-blue-50',    border: 'border-blue-200',   icon: PauseCircle },
   completed: { label: 'Completed', dot: 'bg-teal-500',   text: 'text-teal-600',   bg: 'bg-teal-50',    border: 'border-teal-200',   icon: CheckCheck },
   cancelled: { label: 'Cancelled', dot: 'bg-red-400',    text: 'text-red-600',    bg: 'bg-red-50',     border: 'border-red-200',    icon: XCircle },
+  rejected:  { label: 'Declined',  dot: 'bg-rose-500',   text: 'text-rose-600',   bg: 'bg-rose-50',    border: 'border-rose-200',   icon: XCircle },
 };
 
 const MSG_STATUS: Record<ContactStatus, { label: string; text: string; bg: string; border: string }> = {
@@ -51,7 +61,12 @@ function fmtDate(iso: string) {
 function fmtTs(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
-function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
+function isoDate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 /* ─── SIDEBAR ───────────────────────────── */
 const NAV_SECTIONS = [
@@ -68,9 +83,10 @@ const NAV_SECTIONS = [
   { title: 'Enquiries', items: [{ id: 'messages' as NavPage, label: 'Contact Messages', icon: MessageSquare }] },
 ];
 
-function Sidebar({ page, setPage, counts }: {
+function Sidebar({ page, setPage, counts, onLogout }: {
   page: NavPage; setPage: (p: NavPage) => void;
   counts: Record<string, number>;
+  onLogout: () => void;
 }) {
   function badge(id: NavPage) {
     if (id === 'appointments') return counts.pending;
@@ -78,7 +94,7 @@ function Sidebar({ page, setPage, counts }: {
     return 0;
   }
   return (
-    <aside className="w-60 shrink-0 flex flex-col min-h-screen" style={{ background: '#0f172a' }}>
+    <aside className="w-60 shrink-0 flex flex-col h-full overflow-hidden" style={{ background: '#0f172a' }}>
       {/* Logo */}
       <div className="px-5 py-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
         <div className="bg-white rounded-xl px-3 py-2.5 inline-block mb-3">
@@ -91,7 +107,7 @@ function Sidebar({ page, setPage, counts }: {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto hide-scrollbar">
         {NAV_SECTIONS.map(sec => (
           <div key={sec.title}>
             <p className="text-[10px] font-bold uppercase tracking-widest px-3 mb-2" style={{ color: 'rgba(255,255,255,0.2)' }}>{sec.title}</p>
@@ -139,8 +155,15 @@ function Sidebar({ page, setPage, counts }: {
           style={{ color: 'rgba(255,255,255,0.35)' }}
           onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}>
-          <LogOut className="w-3.5 h-3.5" /> Back to Website
+          <ArrowUpRight className="w-3.5 h-3.5" /> View Website
         </a>
+        <button onClick={onLogout}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all text-xs font-medium text-left"
+          style={{ color: 'rgba(255,255,255,0.35)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#fca5a5')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}>
+          <LogOut className="w-3.5 h-3.5" /> Sign out
+        </button>
       </div>
     </aside>
   );
@@ -201,10 +224,10 @@ function ApptRow({ appt, expanded, onToggle, onAction }: {
         </div>
         <div className="text-[10px] text-ink-400 shrink-0">{fmtTs(appt.createdAt)}</div>
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-          {appt.status==='pending'   && <><button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button><button onClick={()=>onAction(appt.id,{status:'hold'})} className="h-7 px-3 text-[11px] font-bold bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center gap-1"><PauseCircle className="w-3 h-3"/>Hold</button></>}
+          {appt.status==='pending'   && <><button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button><button onClick={()=>onAction(appt.id,{status:'hold'})} className="h-7 px-3 text-[11px] font-bold bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center gap-1"><PauseCircle className="w-3 h-3"/>Hold</button><button onClick={()=>onAction(appt.id,{status:'rejected'})} className="h-7 px-3 text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Decline</button></>}
           {appt.status==='approved'  && <><button onClick={()=>onAction(appt.id,{status:'completed'})} className="h-7 px-3 text-[11px] font-bold bg-teal-500 hover:bg-teal-600 text-white rounded-full flex items-center gap-1"><CheckCheck className="w-3 h-3"/>Complete</button><button onClick={()=>onAction(appt.id,{status:'cancelled'})} className="h-7 px-3 text-[11px] font-bold bg-red-400 hover:bg-red-500 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Cancel</button></>}
-          {appt.status==='hold'      && <button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button>}
-          {(appt.status==='completed'||appt.status==='cancelled') && <button onClick={()=>onAction(appt.id,{status:'pending'})} className="h-7 px-3 text-[11px] font-bold bg-orange-400 hover:bg-orange-500 text-white rounded-full flex items-center gap-1"><Clock className="w-3 h-3"/>Reopen</button>}
+          {appt.status==='hold'      && <><button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button><button onClick={()=>onAction(appt.id,{status:'rejected'})} className="h-7 px-3 text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Decline</button></>}
+          {(appt.status==='completed'||appt.status==='cancelled'||appt.status==='rejected') && <button onClick={()=>onAction(appt.id,{status:'pending'})} className="h-7 px-3 text-[11px] font-bold bg-orange-400 hover:bg-orange-500 text-white rounded-full flex items-center gap-1"><Clock className="w-3 h-3"/>Reopen</button>}
           <button onClick={onToggle} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-primary-900 text-ink-500 hover:text-primary-900 rounded-full transition-all">
             {expanded?<ChevronUp className="w-3.5 h-3.5"/>:<ChevronDown className="w-3.5 h-3.5"/>}
           </button>
@@ -220,7 +243,7 @@ function ApptRow({ appt, expanded, onToggle, onAction }: {
                 <button onClick={onToggle} className="text-ink-400 hover:text-ink-700 w-6 h-6 flex items-center justify-center rounded-full hover:bg-ink-100 transition-all"><X className="w-3.5 h-3.5"/></button>
               </div>
               <div className="grid sm:grid-cols-3 gap-2.5 mb-3">
-                {[['Full Name',`${appt.firstName} ${appt.lastName}`],['Email',appt.email],['Phone',appt.phone],['Date of Birth',appt.dob],['Gender',appt.gender],['Insurance',appt.insuranceName||'—']].map(([l,v])=>(
+                {[['Full Name',`${appt.firstName} ${appt.lastName}`],['Email',appt.email],['Phone',appt.phone],['Date of Birth',appt.dob],['Gender',appt.gender],['Email verified',appt.emailVerified?'Yes':'No']].map(([l,v])=>(
                   <div key={l} className="bg-white rounded-xl p-3 border border-ink-100">
                     <div className="text-[10px] text-ink-400 uppercase tracking-wider mb-0.5">{l}</div>
                     <div className="font-semibold text-ink-800 text-xs">{v||'—'}</div>
@@ -305,104 +328,173 @@ function MsgRow({ msg, expanded, onToggle, onStatus }: {
 function CalendarView({ appointments }: { appointments: Appointment[] }) {
   const today = new Date();
   const [cur, setCur] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [view, setView] = useState<'month'|'week'|'day'>('month');
+  const [selDay, setSelDay] = useState<number | null>(today.getDate());
 
   const daysInMonth = new Date(cur.year, cur.month + 1, 0).getDate();
   const firstDay    = new Date(cur.year, cur.month, 1).getDay();
   const monthName   = new Date(cur.year, cur.month).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
+  function dateStrFor(d: number) {
+    return `${cur.year}-${String(cur.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
   function apptsByDate(d: number) {
-    const dateStr = `${cur.year}-${String(cur.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    return appointments.filter(a => a.date === dateStr);
+    return appointments.filter(a => a.date === dateStrFor(d) && a.status === 'approved');
   }
 
   const statusColors: Record<AppointmentStatus, string> = {
     pending: 'bg-orange-400', approved: 'bg-green-500', hold: 'bg-blue-400',
-    completed: 'bg-teal-500', cancelled: 'bg-red-400',
+    completed: 'bg-teal-500', cancelled: 'bg-red-400', rejected: 'bg-rose-500',
   };
 
+  const selectedAppts = selDay ? apptsByDate(selDay) : [];
+
   return (
-    <div className="bg-white rounded-2xl border border-ink-100 shadow-soft overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={()=>setCur(p=>{ const d=new Date(p.year,p.month-1); return {year:d.getFullYear(),month:d.getMonth()}; })}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-ink-50 border border-ink-100 transition-all">
-            <ChevronLeft className="w-4 h-4"/>
-          </button>
-          <h2 className="font-bold text-ink-900 text-base">{monthName}</h2>
-          <button onClick={()=>setCur(p=>{ const d=new Date(p.year,p.month+1); return {year:d.getFullYear(),month:d.getMonth()}; })}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-ink-50 border border-ink-100 transition-all">
-            <ChevronRight className="w-4 h-4"/>
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-soft overflow-hidden">
+        <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={()=>setCur(p=>{ const d=new Date(p.year,p.month-1); return {year:d.getFullYear(),month:d.getMonth()}; })}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-ink-50 border border-ink-100 transition-all">
+              <ChevronLeft className="w-4 h-4"/>
+            </button>
+            <div>
+              <h2 className="font-bold text-ink-900 text-base">{monthName}</h2>
+              <p className="text-[10px] text-ink-400 font-medium">Approved appointments only</p>
+            </div>
+            <button onClick={()=>setCur(p=>{ const d=new Date(p.year,p.month+1); return {year:d.getFullYear(),month:d.getMonth()}; })}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-ink-50 border border-ink-100 transition-all">
+              <ChevronRight className="w-4 h-4"/>
+            </button>
+          </div>
+          <button onClick={()=>{setCur({year:today.getFullYear(),month:today.getMonth()}); setSelDay(today.getDate());}}
+            className="text-xs font-semibold text-primary-900 hover:text-orange-500 border border-ink-200 hover:border-primary-900 px-3 py-1.5 rounded-full transition-all">
+            Today
           </button>
         </div>
-        <button onClick={()=>setCur({year:today.getFullYear(),month:today.getMonth()})}
-          className="text-xs font-semibold text-primary-900 hover:text-orange-500 border border-ink-200 hover:border-primary-900 px-3 py-1.5 rounded-full transition-all">
-          Today
-        </button>
-      </div>
 
-      {/* Day headers */}
-      <div className="grid grid-cols-7 border-b border-ink-100">
-        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
-          <div key={d} className="text-center py-2 text-xs font-bold text-ink-400 uppercase tracking-wider">{d}</div>
-        ))}
-      </div>
+        <div className="grid grid-cols-7 border-b border-ink-100">
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
+            <div key={d} className="text-center py-2 text-xs font-bold text-ink-400 uppercase tracking-wider">{d}</div>
+          ))}
+        </div>
 
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7">
-        {Array.from({length: firstDay}).map((_,i)=>(
-          <div key={`e${i}`} className="min-h-[90px] border-b border-r border-ink-50 bg-ink-50/30"/>
-        ))}
-        {Array.from({length: daysInMonth}).map((_,i)=>{
-          const day = i + 1;
-          const appts = apptsByDate(day);
-          const isToday = day===today.getDate() && cur.month===today.getMonth() && cur.year===today.getFullYear();
-          return (
-            <div key={day} className={`min-h-[90px] p-2 border-b border-r border-ink-100 ${isToday?'bg-primary-50/40':''}`}>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1.5 ${isToday?'bg-primary-900 text-white':'text-ink-700'}`}>{day}</div>
-              <div className="space-y-0.5">
-                {appts.slice(0,3).map(a=>(
-                  <div key={a.id} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md truncate text-white ${statusColors[a.status]}`} title={`${a.firstName} ${a.lastName} — ${a.time}`}>
-                    {a.time.split(' ')[0]} {a.firstName}
+        <div className="grid grid-cols-7">
+          {Array.from({length: firstDay}).map((_,i)=>(
+            <div key={`e${i}`} className="min-h-[108px] border-b border-r border-ink-50 bg-ink-50/30"/>
+          ))}
+          {Array.from({length: daysInMonth}).map((_,i)=>{
+            const day = i + 1;
+            const appts = apptsByDate(day);
+            const clinic = clinicForDate(cur.year, cur.month, day);
+            const isToday = day===today.getDate() && cur.month===today.getMonth() && cur.year===today.getFullYear();
+            const isSel = selDay === day;
+            return (
+              <button key={day} type="button" onClick={()=>setSelDay(day)}
+                className={`min-h-[108px] p-1.5 border-b border-r border-ink-100 text-left transition-colors ${isToday?'bg-primary-50/40':''} ${isSel?'ring-2 ring-inset ring-primary-400':''}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1 ${isToday?'bg-primary-900 text-white':'text-ink-700'}`}>{day}</div>
+                {clinic && (
+                  <div className="text-[9px] font-semibold text-ink-500 leading-tight mb-1 truncate" title={`${clinic.doctor} · ${clinic.location}`}>
+                    {clinic.doctor}
+                    <span className="block text-[8px] font-medium text-ink-400">{clinic.location}</span>
                   </div>
-                ))}
-                {appts.length>3 && <div className="text-[10px] text-ink-400 font-medium">+{appts.length-3} more</div>}
-              </div>
-            </div>
-          );
-        })}
+                )}
+                <div className="space-y-0.5">
+                  {appts.slice(0,3).map(a=>(
+                    <div key={a.id} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md truncate text-white ${statusColors[a.status]}`}
+                      title={`${a.time} · ${clinic?.doctor || 'Dr. Abidi'} · ${a.firstName} ${a.lastName}`}>
+                      {a.time}
+                    </div>
+                  ))}
+                  {appts.length>3 && <div className="text-[10px] text-ink-400 font-medium">+{appts.length-3} more</div>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="px-6 py-3 border-t border-ink-100 flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-1.5 text-xs text-ink-500">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500"/>
+            Approved
+          </span>
+          <span className="text-[10px] text-ink-400">Pending and on-hold requests appear in Appointments until the doctor approves them.</span>
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="px-6 py-3 border-t border-ink-100 flex flex-wrap gap-3">
-        {(Object.entries(APPT_STATUS) as [AppointmentStatus, typeof APPT_STATUS[AppointmentStatus]][]).map(([s,c])=>(
-          <span key={s} className="flex items-center gap-1.5 text-xs text-ink-500">
-            <span className={`w-2.5 h-2.5 rounded-full ${c.dot}`}/>
-            {c.label}
-          </span>
-        ))}
-      </div>
+      {selDay && (
+        <div className="bg-white rounded-2xl border border-ink-100 shadow-soft p-5">
+          <h3 className="font-bold text-ink-900 text-sm mb-3">
+            {new Date(dateStrFor(selDay)).toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' })}
+          </h3>
+          {selectedAppts.length===0 ? (
+            <p className="text-sm text-ink-400">No approved appointments on this day.</p>
+          ) : (
+            <div className="space-y-2">
+              {selectedAppts.sort((a,b)=>a.time.localeCompare(b.time)).map(a=>(
+                <div key={a.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-ink-100 px-4 py-3">
+                  <span className={`text-xs font-black text-white px-2.5 py-1 rounded-md ${statusColors[a.status]}`}>{a.time}</span>
+                  <ApptBadge status={a.status}/>
+                  <span className="text-sm font-semibold text-ink-800">{a.firstName} {a.lastName}</span>
+                  <span className="text-xs text-ink-400">Dr. Abidi · {a.packageName} · {a.location}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 /* ─── SLOT MANAGEMENT ───────────────────── */
-function SlotManagement({ appointments }: { appointments: Appointment[] }) {
+function SlotManagement({ appointments, slotConfigs, onSaved }: {
+  appointments: Appointment[];
+  slotConfigs: SlotConfig[];
+  onSaved: () => void;
+}) {
   const today = new Date();
   const [selDate, setSelDate] = useState(isoDate(today));
   const [selLoc,  setSelLoc]  = useState<'Freehold'|'Brick'>('Freehold');
-  const [cfg, setCfg] = useState(() => getSlotConfig(isoDate(today), 'Freehold'));
+  const [cfg, setCfg] = useState<SlotConfig>({ date: isoDate(today), location: 'Freehold', dayBlocked: false, blockedTimes: [] });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [blockingKey, setBlockingKey] = useState('');
+  const [slotError, setSlotError] = useState('');
+
+  function findCfg(date: string, loc: 'Freehold'|'Brick'): SlotConfig {
+    return slotConfigs.find(s => s.date === date && s.location === loc)
+      || { date, location: loc, dayBlocked: false, blockedTimes: [] };
+  }
+
+  useEffect(() => {
+    setCfg(findCfg(selDate, selLoc));
+  }, [slotConfigs, selDate, selLoc]);
 
   function load(date: string, loc: 'Freehold'|'Brick') {
     setSelDate(date); setSelLoc(loc);
-    setCfg(getSlotConfig(date, loc));
+    setCfg(findCfg(date, loc));
     setSaved(false);
+    setSlotError('');
   }
 
   function toggleDay() {
     setCfg(p=>({...p, dayBlocked: !p.dayBlocked})); setSaved(false);
+  }
+
+  async function toggleDateBlock(date: string, loc: 'Freehold'|'Brick') {
+    const current = findCfg(date, loc);
+    const next: SlotConfig = { ...current, date, location: loc, dayBlocked: !current.dayBlocked };
+    setBlockingKey(`${date}-${loc}`);
+    setSlotError('');
+    try {
+      await saveSlotConfig(next);
+      if (date === selDate && loc === selLoc) setCfg(next);
+      onSaved();
+    } catch (err) {
+      setSlotError(err instanceof Error ? err.message : 'Could not update this date.');
+    } finally {
+      setBlockingKey('');
+    }
   }
 
   function toggleSlot(t: string) {
@@ -412,15 +504,23 @@ function SlotManagement({ appointments }: { appointments: Appointment[] }) {
     })); setSaved(false);
   }
 
-  function save() {
-    saveSlotConfig({...cfg, date: selDate, location: selLoc});
-    setSaved(true);
-    setTimeout(()=>setSaved(false), 2000);
+  async function save() {
+    setSaving(true);
+    setSlotError('');
+    try {
+      await saveSlotConfig({...cfg, date: selDate, location: selLoc});
+      setSaved(true);
+      onSaved();
+      setTimeout(()=>setSaved(false), 2000);
+    } catch (err) {
+      setSlotError(err instanceof Error ? err.message : 'Could not save slots.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const bookedForDay = appointments.filter(a => a.date===selDate && a.location===selLoc && a.status!=='cancelled').map(a=>a.time);
+  const bookedForDay = appointments.filter(a => a.date===selDate && a.location===selLoc && a.status!=='cancelled' && a.status!=='rejected').map(a=>a.time);
 
-  // Generate next 21 days
   const days: {date:string; loc:'Freehold'|'Brick'}[] = [];
   const d = new Date(today);
   d.setDate(d.getDate());
@@ -434,26 +534,42 @@ function SlotManagement({ appointments }: { appointments: Appointment[] }) {
 
   return (
     <div className="grid lg:grid-cols-3 gap-5">
-      {/* Day picker */}
       <div className="bg-white rounded-2xl border border-ink-100 shadow-soft p-5">
         <h3 className="font-bold text-ink-900 text-sm mb-4 flex items-center gap-2"><CalendarDays className="w-4 h-4 text-primary-900"/>Select Date</h3>
-        <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+        <div className="space-y-1.5 max-h-96 overflow-y-auto hide-scrollbar pr-1">
           {days.map(({date,loc})=>{
-            const dayCfg = getSlotConfig(date, loc);
+            const dayCfg = findCfg(date, loc);
             const isSelected = date===selDate && loc===selLoc;
+            const rowKey = `${date}-${loc}`;
             return (
-              <button key={`${date}-${loc}`} onClick={()=>load(date,loc)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all text-sm ${isSelected?'border-primary-900 bg-primary-50':'border-ink-100 hover:border-primary-200'}`}>
-                <div>
-                  <div className={`font-semibold text-xs ${isSelected?'text-primary-900':'text-ink-800'}`}>
-                    {new Date(date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+              <div key={rowKey}
+                className={`w-full flex items-center gap-1 rounded-xl border transition-all ${isSelected?'border-primary-900 bg-primary-50':'border-ink-100 hover:border-primary-200'}`}>
+                <button type="button" onClick={()=>load(date,loc)}
+                  className="flex-1 min-w-0 flex items-center justify-between px-3 py-2.5 text-left text-sm">
+                  <div>
+                    <div className={`font-semibold text-xs ${isSelected?'text-primary-900':'text-ink-800'}`}>
+                      {new Date(date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+                    </div>
+                    <div className={`text-[10px] mt-0.5 ${isSelected?'text-primary-600':'text-ink-400'}`}>{loc}</div>
                   </div>
-                  <div className={`text-[10px] mt-0.5 ${isSelected?'text-primary-600':'text-ink-400'}`}>{loc}</div>
-                </div>
-                {dayCfg.dayBlocked
-                  ? <span className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Blocked</span>
-                  : <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Open</span>}
-              </button>
+                  {dayCfg.dayBlocked
+                    ? <span className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Blocked</span>
+                    : <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Open</span>}
+                </button>
+                <button type="button"
+                  title={dayCfg.dayBlocked ? 'Unblock this entire date' : 'Block this entire date'}
+                  disabled={blockingKey===rowKey}
+                  onClick={()=>toggleDateBlock(date, loc)}
+                  className={`shrink-0 mr-2 w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${
+                    dayCfg.dayBlocked
+                      ? 'border-red-200 bg-red-50 text-red-500 hover:bg-red-100'
+                      : 'border-ink-200 bg-white text-ink-400 hover:border-red-300 hover:text-red-500'
+                  }`}>
+                  {blockingKey===rowKey
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin"/>
+                    : dayCfg.dayBlocked ? <Unlock className="w-3.5 h-3.5"/> : <Lock className="w-3.5 h-3.5"/>}
+                </button>
+              </div>
             );
           })}
         </div>
@@ -509,8 +625,10 @@ function SlotManagement({ appointments }: { appointments: Appointment[] }) {
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-100 border border-red-200"/>Blocked</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-white border border-ink-200"/>Available</span>
           </div>
-          <button onClick={save} className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all ${saved?'bg-green-500 text-white':'bg-primary-900 hover:bg-primary-800 text-white'}`}>
-            <Save className="w-3.5 h-3.5"/>{saved ? 'Saved ✓' : 'Save Changes'}
+          {slotError && <span className="text-xs text-red-500">{slotError}</span>}
+          <button onClick={save} disabled={saving} className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all disabled:opacity-60 ${saved?'bg-green-500 text-white':'bg-primary-900 hover:bg-primary-800 text-white'}`}>
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Save className="w-3.5 h-3.5"/>}
+            {saved ? 'Saved ✓' : saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>
@@ -533,19 +651,45 @@ function EmptyState({ icon: Icon, text }: { icon: React.ElementType; text: strin
 const EMPTY_COND: Omit<CmsCondition,'id'|'createdAt'|'updatedAt'> = { slug:'',title:'',href:'',heroEyebrow:'',shortDescription:'',cardImage:'',heroImage:'',overview:'',symptoms:'',treatmentIntro:'',metaTitle:'',metaDescription:'',enabled:true };
 const EMPTY_PKG:  Omit<CmsIVPackage,'id'|'createdAt'|'updatedAt'> = { slug:'',name:'',price:0,badge:'',image:'',tagline:'',description:'',dosages:'',bestFor:'',ingredients:'',addOns:'',enabled:true };
 
-function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; onSave:(c:CmsCondition)=>void; onCancel:()=>void }) {
+function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; onSave:(c:CmsCondition)=>void|Promise<void>; onCancel:()=>void }) {
   const [f,setF]=useState(initial?{...initial}:{...EMPTY_COND});
   const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
   const inp="w-full border border-ink-200 focus:border-primary-900 rounded-xl px-4 py-2.5 text-sm outline-none transition-colors";
   const lbl="block text-xs font-semibold text-ink-700 mb-1.5";
   function handle(e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>){setF(p=>({...p,[e.target.name]:e.target.value}));}
-  function handleSubmit(e:React.FormEvent){e.preventDefault();if(!f.title.trim()){setErr('Title required');return;}const now=new Date().toISOString();const s=f.slug||makeSlug(f.title);onSave({...f,slug:s,href:`/${s}/`,id:initial?.id||newId(),createdAt:initial?.createdAt||now,updatedAt:now});}
+  async function handleSubmit(e:React.FormEvent){
+    e.preventDefault();
+    if(!f.title.trim()){setErr('Title required');return;}
+    setSaving(true); setErr('');
+    const now=new Date().toISOString();
+    const slug = (f.slug || makeSlug(f.title)).trim();
+    try {
+      await onSave({...f,slug,href:`/${slug}/`,id:initial?.id||newId(),createdAt:initial?.createdAt||now,updatedAt:now});
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : 'Could not save.');
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-ink-100 shadow-soft overflow-hidden">
-      <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between bg-ink-50"><h3 className="font-bold text-ink-900 text-sm flex items-center gap-2"><Activity className="w-4 h-4 text-primary-900"/>{initial?'Edit Condition':'Add Condition'}</h3><button type="button" onClick={onCancel}><X className="w-4 h-4 text-ink-400"/></button></div>
+      <div className="sticky top-0 z-20 px-6 py-3 border-b border-ink-100 flex items-center justify-between gap-3 bg-white">
+        <h3 className="font-bold text-ink-900 text-sm flex items-center gap-2 min-w-0">
+          <Activity className="w-4 h-4 text-primary-900 shrink-0"/>
+          <span className="truncate">{initial ? 'Edit Condition' : 'Add Condition'}</span>
+        </h3>
+        <div className="flex items-center gap-2 shrink-0">
+          <button type="button" onClick={onCancel} className="h-9 px-4 text-xs font-semibold border border-ink-200 hover:border-ink-400 text-ink-700 rounded-full transition-all">Discard</button>
+          <button type="submit" disabled={saving} className="h-9 px-5 text-xs font-bold bg-primary-900 hover:bg-primary-800 disabled:opacity-60 text-white rounded-full inline-flex items-center gap-1.5">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Save className="w-3.5 h-3.5"/>}
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
       <div className="p-6 grid sm:grid-cols-2 gap-4">
         <div><label className={lbl}>Title *</label><input name="title" required value={f.title} onChange={handle} className={inp}/></div>
-        <div><label className={lbl}>Slug</label><input name="slug" value={f.slug} onChange={handle} className={inp} placeholder="auto-generated"/></div>
+        <div><label className={lbl}>URL slug</label><input name="slug" value={f.slug} onChange={handle} className={inp} placeholder="auto-generated from title"/><p className="text-[10px] text-ink-400 mt-1">/{f.slug || 'slug'}/</p></div>
         <div><label className={lbl}>Eyebrow</label><input name="heroEyebrow" value={f.heroEyebrow} onChange={handle} className={inp}/></div>
         <div><label className={lbl}>Short Description</label><input name="shortDescription" value={f.shortDescription} onChange={handle} className={inp}/></div>
         <div><label className={lbl}>Card Image</label><input name="cardImage" value={f.cardImage} onChange={handle} className={inp} placeholder="/image.jpeg"/></div>
@@ -557,25 +701,51 @@ function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; 
         <div><label className={lbl}>Meta Description</label><input name="metaDescription" value={f.metaDescription} onChange={handle} className={inp}/></div>
         <div className="flex items-center gap-3"><label className={lbl+" mb-0"}>Published</label><button type="button" onClick={()=>setF(p=>({...p,enabled:!p.enabled}))} className={f.enabled?'text-green-500':'text-ink-300'}>{f.enabled?<ToggleRight className="w-8 h-8"/>:<ToggleLeft className="w-8 h-8"/>}</button><span className={`text-xs font-semibold ${f.enabled?'text-green-600':'text-ink-400'}`}>{f.enabled?'Published':'Draft'}</span></div>
         {err&&<div className="sm:col-span-2 text-red-500 text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4"/>{err}</div>}
-        <div className="sm:col-span-2 flex gap-3 pt-2 border-t border-ink-100"><button type="button" onClick={onCancel} className="flex-1 border border-ink-200 hover:border-primary-900 text-ink-700 font-semibold px-5 py-2.5 rounded-full text-sm transition-all">Cancel</button><button type="submit" className="flex-[2] bg-primary-900 hover:bg-primary-800 text-white font-semibold px-5 py-2.5 rounded-full text-sm flex items-center justify-center gap-2"><Save className="w-4 h-4"/>Save</button></div>
       </div>
     </form>
   );
 }
 
-function IVPackageForm({ initial, onSave, onCancel }: { initial?: CmsIVPackage; onSave:(p:CmsIVPackage)=>void; onCancel:()=>void }) {
+function IVPackageForm({ initial, onSave, onCancel }: { initial?: CmsIVPackage; onSave:(p:CmsIVPackage)=>void|Promise<void>; onCancel:()=>void }) {
   const [f,setF]=useState(initial?{...initial}:{...EMPTY_PKG});
   const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
   const inp="w-full border border-ink-200 focus:border-primary-900 rounded-xl px-4 py-2.5 text-sm outline-none transition-colors";
   const lbl="block text-xs font-semibold text-ink-700 mb-1.5";
   function handle(e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>){const{name,value}=e.target;setF(p=>({...p,[name]:name==='price'||name==='totalValue'?Number(value):value}));}
-  function handleSubmit(e:React.FormEvent){e.preventDefault();if(!f.name.trim()){setErr('Name required');return;}if(!f.price){setErr('Price required');return;}const now=new Date().toISOString();const s=f.slug||makeSlug(f.name);onSave({...f,slug:s,id:initial?.id||newId(),createdAt:initial?.createdAt||now,updatedAt:now});}
+  async function handleSubmit(e:React.FormEvent){
+    e.preventDefault();
+    if(!f.name.trim()){setErr('Name required');return;}
+    if(!f.price){setErr('Price required');return;}
+    setSaving(true); setErr('');
+    const now=new Date().toISOString();
+    const slug = (f.slug || makeSlug(f.name)).trim();
+    try {
+      await onSave({...f,slug,id:initial?.id||newId(),createdAt:initial?.createdAt||now,updatedAt:now});
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : 'Could not save.');
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-ink-100 shadow-soft overflow-hidden">
-      <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between bg-ink-50"><h3 className="font-bold text-ink-900 text-sm flex items-center gap-2"><Syringe className="w-4 h-4 text-primary-900"/>{initial?'Edit Package':'Add Package'}</h3><button type="button" onClick={onCancel}><X className="w-4 h-4 text-ink-400"/></button></div>
+      <div className="sticky top-0 z-20 px-6 py-3 border-b border-ink-100 flex items-center justify-between gap-3 bg-white">
+        <h3 className="font-bold text-ink-900 text-sm flex items-center gap-2 min-w-0">
+          <Syringe className="w-4 h-4 text-primary-900 shrink-0"/>
+          <span className="truncate">{initial ? 'Edit Package' : 'Add Package'}</span>
+        </h3>
+        <div className="flex items-center gap-2 shrink-0">
+          <button type="button" onClick={onCancel} className="h-9 px-4 text-xs font-semibold border border-ink-200 hover:border-ink-400 text-ink-700 rounded-full transition-all">Discard</button>
+          <button type="submit" disabled={saving} className="h-9 px-5 text-xs font-bold bg-primary-900 hover:bg-primary-800 disabled:opacity-60 text-white rounded-full inline-flex items-center gap-1.5">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Save className="w-3.5 h-3.5"/>}
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
       <div className="p-6 grid sm:grid-cols-2 gap-4">
         <div><label className={lbl}>Name *</label><input name="name" required value={f.name} onChange={handle} className={inp}/></div>
-        <div><label className={lbl}>Slug</label><input name="slug" value={f.slug} onChange={handle} className={inp} placeholder="auto-generated"/></div>
+        <div><label className={lbl}>URL slug</label><input name="slug" value={f.slug} onChange={handle} className={inp} placeholder="auto-generated from name"/><p className="text-[10px] text-ink-400 mt-1">/iv-packages/{f.slug || 'slug'}/</p></div>
         <div><label className={lbl}>Price ($) *</label><input name="price" type="number" required value={f.price||''} onChange={handle} className={inp}/></div>
         <div><label className={lbl}>Total Value ($)</label><input name="totalValue" type="number" value={f.totalValue||''} onChange={handle} className={inp}/></div>
         <div><label className={lbl}>Badge</label><input name="badge" value={f.badge||''} onChange={handle} className={inp} placeholder="Most Popular"/></div>
@@ -588,7 +758,6 @@ function IVPackageForm({ initial, onSave, onCancel }: { initial?: CmsIVPackage; 
         <div className="sm:col-span-2"><label className={lbl}>Add-Ons (name|price|desc — one per line)</label><textarea name="addOns" rows={3} value={f.addOns} onChange={handle} className={inp+" resize-none font-mono text-xs"}/></div>
         <div className="flex items-center gap-3"><label className={lbl+" mb-0"}>Published</label><button type="button" onClick={()=>setF(p=>({...p,enabled:!p.enabled}))} className={f.enabled?'text-green-500':'text-ink-300'}>{f.enabled?<ToggleRight className="w-8 h-8"/>:<ToggleLeft className="w-8 h-8"/>}</button><span className={`text-xs font-semibold ${f.enabled?'text-green-600':'text-ink-400'}`}>{f.enabled?'Published':'Draft'}</span></div>
         {err&&<div className="sm:col-span-2 text-red-500 text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4"/>{err}</div>}
-        <div className="sm:col-span-2 flex gap-3 pt-2 border-t border-ink-100"><button type="button" onClick={onCancel} className="flex-1 border border-ink-200 hover:border-primary-900 text-ink-700 font-semibold px-5 py-2.5 rounded-full text-sm transition-all">Cancel</button><button type="submit" className="flex-[2] bg-primary-900 hover:bg-primary-800 text-white font-semibold px-5 py-2.5 rounded-full text-sm flex items-center justify-center gap-2"><Save className="w-4 h-4"/>Save</button></div>
       </div>
     </form>
   );
@@ -596,31 +765,138 @@ function IVPackageForm({ initial, onSave, onCancel }: { initial?: CmsIVPackage; 
 
 /* ─── MAIN DASHBOARD ────────────────────── */
 export function AdminDashboard() {
+  const [sessionReady, setSessionReady] = useState(false);
+  const [authed, setAuthed] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [messages,     setMessages]     = useState<ContactMessage[]>([]);
   const [conditions,   setConditions]   = useState<CmsCondition[]>([]);
   const [ivPackages,   setIVPackages]   = useState<CmsIVPackage[]>([]);
-  const [page,      setPage]      = useState<NavPage>('overview');
+  const [slotConfigs,  setSlotConfigs]  = useState<SlotConfig[]>([]);
+  const navigate = useNavigate();
+  const { page: pageParam } = useParams<{ page: string }>();
+  const page: NavPage = isNavPage(pageParam) ? pageParam : 'overview';
+  const setPage = useCallback((p: NavPage) => { navigate(`/admin/${p}`); }, [navigate]);
   const [expanded,  setExpanded]  = useState<string|null>(null);
   const [search,    setSearch]    = useState('');
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus|'all'>('all');
   const [editingCond, setEditingCond] = useState<CmsCondition|null|'new'>(null);
   const [editingPkg,  setEditingPkg]  = useState<CmsIVPackage|null|'new'>(null);
   const [delConfirm,  setDelConfirm]  = useState<string|null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
 
-  const load = useCallback(() => {
-    setAppointments(getAppointments().sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()));
-    setMessages(getContactMessages().sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()));
-    setConditions(getCmsConditions());
-    setIVPackages(getCmsIVPackages());
+  const load = useCallback(async () => {
+    try {
+      setLoadError('');
+      const [appts, msgs, conds, pkgs, slots] = await Promise.all([
+        getAppointments(),
+        getContactMessages(),
+        getCmsConditions(),
+        getCmsIVPackages(),
+        getSlotConfigs(),
+      ]);
+      setAppointments(appts.sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()));
+      setMessages(msgs.sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()));
+      setConditions(conds);
+      setIVPackages(pkgs);
+      setSlotConfigs(slots);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Could not load admin data.');
+    }
   }, []);
 
   useEffect(() => {
-    load();
-    window.addEventListener('storage', load);
-    return () => window.removeEventListener('storage', load);
-  }, [load]);
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return;
+      setAuthed(!!data.session);
+      setSessionReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(!!session);
+      setSessionReady(true);
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
+  useEffect(() => {
+    if (!authed) return;
+    load();
+    const channel = supabase
+      .channel('admin-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => { load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_messages' }, () => { load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_configs' }, () => { load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_conditions' }, () => { load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_iv_packages' }, () => { load(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [authed, load]);
+
+  useEffect(() => {
+    if (pageParam && !isNavPage(pageParam)) navigate('/admin/overview', { replace: true });
+  }, [pageParam, navigate]);
+
+  async function handleAppt(id: string, patch: Partial<Appointment>) {
+    setActionError('');
+    try {
+      if (patch.status === 'approved' || patch.status === 'rejected') {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) throw new Error('Please sign in again to review appointments.');
+        const result = await reviewBooking(id, patch.status === 'approved' ? 'approve' : 'reject', token, patch.rejectionReason || '');
+        if (result.warning) setActionError(result.warning);
+      } else {
+        await updateAppointment(id, patch);
+      }
+      await load();
+    }
+    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not update appointment.'); }
+  }
+  async function handleMsg(id: string, s: ContactStatus) {
+    setActionError('');
+    try { await updateContactStatus(id, s); await load(); }
+    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not update message.'); }
+  }
+  async function saveCond(c: CmsCondition) {
+    setActionError('');
+    try {
+      await saveCmsCondition(c);
+      setEditingCond(null);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not save condition.');
+      throw err;
+    }
+  }
+  async function savePkg(p: CmsIVPackage) {
+    setActionError('');
+    try {
+      await saveCmsIVPackage(p);
+      setEditingPkg(null);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not save package.');
+      throw err;
+    }
+  }
+  async function delCond(id: string) {
+    try { await deleteCmsCondition(id); setDelConfirm(null); await load(); }
+    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not delete condition.'); }
+  }
+  async function delPkg(id: string) {
+    try { await deleteCmsIVPackage(id); setDelConfirm(null); await load(); }
+    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not delete package.'); }
+  }
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setAuthed(false);
+  }
+
+  const todayStr = isoDate(new Date());
   const counts = {
     total:       appointments.length,
     pending:     appointments.filter(a=>a.status==='pending').length,
@@ -628,15 +904,12 @@ export function AdminDashboard() {
     hold:        appointments.filter(a=>a.status==='hold').length,
     completed:   appointments.filter(a=>a.status==='completed').length,
     cancelled:   appointments.filter(a=>a.status==='cancelled').length,
+    rejected:    appointments.filter(a=>a.status==='rejected').length,
+    today:       appointments.filter(a=>a.date===todayStr && a.status==='approved').length,
     newMessages: messages.filter(m=>m.status==='new').length,
+    liveConditions: staticConditions.length + conditions.filter(c=>c.enabled && !c.id.startsWith('static-')).length,
+    livePackages: staticIVPackages.length + ivPackages.filter(p=>p.enabled && !p.id.startsWith('static-')).length,
   };
-
-  function handleAppt(id: string, patch: Partial<Appointment>) { updateAppointment(id, patch); load(); }
-  function handleMsg(id: string, s: ContactStatus)             { updateContactStatus(id, s); load(); }
-  function saveCond(c: CmsCondition) { saveCmsCondition(c); setEditingCond(null); load(); }
-  function savePkg(p: CmsIVPackage)  { saveCmsIVPackage(p); setEditingPkg(null); load(); }
-  function delCond(id: string) { deleteCmsCondition(id); setDelConfirm(null); load(); }
-  function delPkg(id: string)  { deleteCmsIVPackage(id); setDelConfirm(null); load(); }
 
   const filteredAppts = appointments.filter(a => {
     const matchStatus = statusFilter==='all' || a.status===statusFilter;
@@ -652,15 +925,24 @@ export function AdminDashboard() {
     conditions:'Conditions We Treat', 'iv-packages':'IV Packages',
   };
 
+  if (!sessionReady) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-slate-50">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-900"/>
+      </div>
+    );
+  }
+  if (!authed) return <AdminLogin onReady={() => setAuthed(true)} />;
+
   return (
     <>
       <Seo title="Admin | MD Abidi Arthritis Institute" description="Admin dashboard."/>
-      <div className="flex min-h-screen" style={{ background: '#f1f5f9' }}>
-        <Sidebar page={page} setPage={setPage} counts={counts}/>
+      <div className="flex h-screen overflow-hidden" style={{ background: '#f1f5f9' }}>
+        <Sidebar page={page} setPage={setPage} counts={counts} onLogout={handleLogout}/>
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Header */}
-          <header className="bg-white px-7 py-4 flex items-center justify-between gap-4 sticky top-0 z-10" style={{ borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <header className="bg-white px-7 py-4 flex items-center justify-between gap-4 shrink-0 z-10" style={{ borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#1e3a5f' }}>
                 {page==='overview' && <LayoutDashboard className="w-4 h-4 text-white"/>}
@@ -701,15 +983,26 @@ export function AdminDashboard() {
           </header>
 
           <main className="flex-1 px-6 py-6 overflow-y-auto">
+            {(loadError || actionError) && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5"/>
+                {loadError || actionError}
+              </div>
+            )}
 
             {/* ── OVERVIEW ── */}
             {page==='overview' && (
               <div className="space-y-6">
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <KpiCard label="Total Bookings" value={counts.total}       icon={CalendarDays} color="#1d4ed8" bg="#eff6ff" borderColor="#3b82f6" onClick={()=>{setPage('appointments');setStatusFilter('all');}}/>
                   <KpiCard label="Pending"        value={counts.pending}     icon={Clock}        color="#d97706" bg="#fffbeb" borderColor="#f59e0b" sub={counts.pending>0?`${counts.pending} need action`:undefined} onClick={()=>{setPage('appointments');setStatusFilter('pending');}}/>
                   <KpiCard label="Approved"       value={counts.approved}    icon={CheckCircle2} color="#16a34a" bg="#f0fdf4" borderColor="#22c55e" onClick={()=>{setPage('appointments');setStatusFilter('approved');}}/>
+                  <KpiCard label="Today"          value={counts.today}       icon={CalendarRange} color="#0f766e" bg="#f0fdfa" borderColor="#14b8a6" sub="On the calendar" onClick={()=>setPage('calendar')}/>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <KpiCard label="Completed"      value={counts.completed}   icon={CheckCheck}   color="#0f766e" bg="#f0fdfa" borderColor="#14b8a6" onClick={()=>{setPage('appointments');setStatusFilter('completed');}}/>
+                  <KpiCard label="On Hold"        value={counts.hold}        icon={PauseCircle}  color="#2563eb" bg="#eff6ff" borderColor="#3b82f6" onClick={()=>{setPage('appointments');setStatusFilter('hold');}}/>
+                  <KpiCard label="Live Conditions" value={counts.liveConditions} icon={Activity} color="#7c3aed" bg="#faf5ff" borderColor="#8b5cf6" sub={`${counts.livePackages} IV packages`} onClick={()=>setPage('conditions')}/>
                   <KpiCard label="New Messages"   value={counts.newMessages} icon={Inbox}        color="#7c3aed" bg="#faf5ff" borderColor="#8b5cf6" sub={counts.newMessages>0?`${counts.newMessages} unread`:undefined} onClick={()=>setPage('messages')}/>
                 </div>
                 {/* Recent */}
@@ -732,7 +1025,7 @@ export function AdminDashboard() {
               <div className="space-y-4">
                 {/* Status filter tabs */}
                 <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-3" style={{ border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                  {([['all','All Appointments',counts.total],['pending','Pending',counts.pending],['approved','Approved',counts.approved],['hold','On Hold',counts.hold],['completed','Completed',counts.completed],['cancelled','Cancelled',counts.cancelled]] as [AppointmentStatus|'all',string,number][]).map(([s,l,c])=>(
+                  {([['all','All Appointments',counts.total],['pending','Pending',counts.pending],['approved','Approved',counts.approved],['hold','On Hold',counts.hold],['completed','Completed',counts.completed],['cancelled','Cancelled',counts.cancelled],['rejected','Declined',counts.rejected]] as [AppointmentStatus|'all',string,number][]).map(([s,l,c])=>(
                     <button key={s} onClick={()=>setStatusFilter(s)}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
                       style={{
@@ -756,7 +1049,7 @@ export function AdminDashboard() {
             {page==='calendar' && <CalendarView appointments={appointments}/>}
 
             {/* ── SLOTS ── */}
-            {page==='slots' && <SlotManagement appointments={appointments}/>}
+            {page==='slots' && <SlotManagement appointments={appointments} slotConfigs={slotConfigs} onSaved={load}/>}
 
             {/* ── MESSAGES ── */}
             {page==='messages' && (
@@ -769,26 +1062,30 @@ export function AdminDashboard() {
             {/* ── CONDITIONS ── */}
             {page==='conditions' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-ink-500">{staticConditions.length} built-in · {conditions.length} custom</p>
-                  <button onClick={()=>setEditingCond('new')} className="inline-flex items-center gap-2 bg-primary-900 hover:bg-primary-800 text-white font-semibold text-xs px-5 py-2.5 rounded-full transition-all"><Plus className="w-3.5 h-3.5"/>Add Condition</button>
-                </div>
+                {!editingCond && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-ink-500">{staticConditions.length} built-in · {conditions.filter(c=>!c.id.startsWith('static-')).length} custom</p>
+                    <button onClick={()=>setEditingCond('new')} className="inline-flex items-center gap-2 bg-primary-900 hover:bg-primary-800 text-white font-semibold text-xs px-5 py-2.5 rounded-full transition-all"><Plus className="w-3.5 h-3.5"/>Add Condition</button>
+                  </div>
+                )}
                 {editingCond && <ConditionForm initial={editingCond==='new'?undefined:editingCond} onSave={saveCond} onCancel={()=>setEditingCond(null)}/>}
+                {!editingCond && (
+                <>
                 <div>
                   <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Built-in (9)</p>
                   <div className="grid gap-2">
                     {staticConditions.map(c=>{
                       const stableId=`static-cond-${c.slug}`;
-                      const existing=getCmsConditions().find(x=>x.id===stableId);
+                      const existing=conditions.find(x=>x.id===stableId);
                       return (
                         <div key={c.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing?'border-orange-200':'border-ink-100'}`}>
                           {c.cardImage&&<img src={c.cardImage} alt={c.title} className="w-12 h-9 rounded-lg object-cover shrink-0"/>}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-ink-900 text-xs">{c.title}</h3>
+                              <h3 className="font-bold text-ink-900 text-xs">{existing?.title || c.title}</h3>
                               {existing&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Edited</span>}
                             </div>
-                            <p className="text-[10px] text-ink-400">{c.href}</p>
+                            <p className="text-[10px] text-ink-400">{existing ? `/${existing.slug}/` : c.href}</p>
                           </div>
                           <button onClick={()=>setEditingCond(existing||{id:stableId,slug:c.slug,title:c.title,href:c.href,heroEyebrow:c.heroEyebrow,shortDescription:c.shortDescription,cardImage:c.cardImage,heroImage:c.heroImage,overview:Array.isArray(c.overview)?c.overview.join('\n'):'',symptoms:(c.symptoms||[]).join(', '),treatmentIntro:c.treatmentIntro,metaTitle:c.metaTitle,metaDescription:c.metaDescription,enabled:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
                             className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 shrink-0 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
@@ -806,7 +1103,7 @@ export function AdminDashboard() {
                           {c.cardImage&&<img src={c.cardImage} alt={c.title} className="w-12 h-9 rounded-lg object-cover shrink-0"/>}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2"><h3 className="font-bold text-ink-900 text-xs">{c.title}</h3><span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${c.enabled?'bg-green-50 text-green-600 border border-green-200':'bg-ink-100 text-ink-500'}`}>{c.enabled?'Published':'Draft'}</span></div>
-                            <p className="text-[10px] text-ink-400">/cms-condition/{c.slug}/</p>
+                            <p className="text-[10px] text-ink-400">/{c.slug}/</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button onClick={()=>setEditingCond(c)} className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
@@ -817,23 +1114,29 @@ export function AdminDashboard() {
                     </div>
                   </div>
                 )}
+                </>
+                )}
               </div>
             )}
 
             {/* ── IV PACKAGES ── */}
             {page==='iv-packages' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-ink-500">{staticIVPackages.length} built-in · {ivPackages.length} custom</p>
-                  <button onClick={()=>setEditingPkg('new')} className="inline-flex items-center gap-2 bg-primary-900 hover:bg-primary-800 text-white font-semibold text-xs px-5 py-2.5 rounded-full transition-all"><Plus className="w-3.5 h-3.5"/>Add Package</button>
-                </div>
+                {!editingPkg && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-ink-500">{staticIVPackages.length} built-in · {ivPackages.filter(p=>!p.id.startsWith('static-')).length} custom</p>
+                    <button onClick={()=>setEditingPkg('new')} className="inline-flex items-center gap-2 bg-primary-900 hover:bg-primary-800 text-white font-semibold text-xs px-5 py-2.5 rounded-full transition-all"><Plus className="w-3.5 h-3.5"/>Add Package</button>
+                  </div>
+                )}
                 {editingPkg && <IVPackageForm initial={editingPkg==='new'?undefined:editingPkg} onSave={savePkg} onCancel={()=>setEditingPkg(null)}/>}
+                {!editingPkg && (
+                <>
                 <div>
                   <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Built-in (9)</p>
                   <div className="grid gap-2">
                     {staticIVPackages.map(p=>{
                       const stableId=`static-pkg-${p.slug}`;
-                      const existing=getCmsIVPackages().find(x=>x.id===stableId);
+                      const existing=ivPackages.find(x=>x.id===stableId);
                       return (
                         <div key={p.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing?'border-orange-200':'border-ink-100'}`}>
                           <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center shrink-0">💉</div>
@@ -843,7 +1146,7 @@ export function AdminDashboard() {
                               <span className="font-black text-primary-900 text-xs">${existing?.price||p.price}</span>
                               {existing&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Edited</span>}
                             </div>
-                            <p className="text-[10px] text-ink-400">/iv-packages/{p.slug}/</p>
+                            <p className="text-[10px] text-ink-400">/iv-packages/{existing?.slug || p.slug}/</p>
                           </div>
                           <button onClick={()=>setEditingPkg(existing||{id:stableId,slug:p.slug,name:p.name,price:p.price,badge:'',image:'',tagline:'',description:'',dosages:'',bestFor:'',ingredients:'',addOns:'',enabled:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
                             className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 shrink-0 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
@@ -861,7 +1164,7 @@ export function AdminDashboard() {
                           {p.image&&<img src={p.image} alt={p.name} className="w-10 h-10 rounded-xl object-contain bg-sky-50 p-1 shrink-0"/>}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2"><h3 className="font-bold text-ink-900 text-xs">{p.name}</h3><span className="font-black text-primary-900 text-xs">${p.price}</span>{p.badge&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">{p.badge}</span>}<span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${p.enabled?'bg-green-50 text-green-600 border border-green-200':'bg-ink-100 text-ink-500'}`}>{p.enabled?'Published':'Draft'}</span></div>
-                            <p className="text-[10px] text-ink-400">/iv-packages/cms/{p.slug}/</p>
+                            <p className="text-[10px] text-ink-400">/iv-packages/{p.slug}/</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button onClick={()=>setEditingPkg(p)} className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
@@ -871,6 +1174,8 @@ export function AdminDashboard() {
                       ))}
                     </div>
                   </div>
+                )}
+                </>
                 )}
               </div>
             )}

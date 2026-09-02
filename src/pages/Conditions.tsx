@@ -10,25 +10,43 @@ import { ConditionCard } from '@/components/conditions/ConditionCard';
 import { conditions } from '@/data/conditions';
 import { staggerContainer, staggerFast, scaleIn, fadeUp, viewport } from '@/animations/variants';
 import { getCmsConditions, type CmsCondition } from '@/data/cms';
+import { useCmsRealtime } from '@/lib/cmsLive';
 
 const heroImg = 'https://images.pexels.com/photos/3992806/pexels-photo-3992806.jpeg?auto=compress&cs=tinysrgb&h=900&w=1600';
 
 export function Conditions() {
   const [cmsConditions, setCmsConditions] = useState<CmsCondition[]>([]);
+  const [overrides, setOverrides] = useState<CmsCondition[]>([]);
 
-  function loadCms() {
-    setCmsConditions(getCmsConditions().filter(c => c.enabled));
+  async function loadCms() {
+    try {
+      const all = await getCmsConditions();
+      setOverrides(all.filter(c => c.id.startsWith('static-cond-')));
+      setCmsConditions(all.filter(c => c.enabled && !c.id.startsWith('static-cond-')));
+    } catch {
+      setOverrides([]);
+      setCmsConditions([]);
+    }
   }
 
   useEffect(() => {
     loadCms();
-    window.addEventListener('focus', loadCms);
-    window.addEventListener('storage', loadCms);
-    return () => {
-      window.removeEventListener('focus', loadCms);
-      window.removeEventListener('storage', loadCms);
-    };
   }, []);
+  useCmsRealtime(loadCms);
+
+  const displayConditions = conditions.flatMap(c => {
+    const ov = overrides.find(o => o.slug === c.slug || o.id === `static-cond-${c.slug}`);
+    if (ov && !ov.enabled) return [];
+    if (!ov) return [c];
+    return [{
+      ...c,
+      title: ov.title || c.title,
+      shortDescription: ov.shortDescription || c.shortDescription,
+      cardImage: ov.cardImage || c.cardImage,
+      heroEyebrow: ov.heroEyebrow || c.heroEyebrow,
+      href: `/${ov.slug || c.slug}/`,
+    }];
+  });
 
   return (
     <>
@@ -59,7 +77,7 @@ export function Conditions() {
             viewport={viewport}
             className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
           >
-            {conditions.map((c) => (
+            {displayConditions.map((c) => (
               <ConditionCard key={c.slug} condition={c} />
             ))}
           </motion.div>
@@ -100,7 +118,7 @@ export function Conditions() {
                     <p className="mt-2 text-sm text-ink-600 leading-relaxed line-clamp-3 flex-1">{c.shortDescription}</p>
                     <motion.div variants={fadeUp} className="mt-4">
                       {c.href ? (
-                        <Link to={`/cms-condition/${c.slug}/`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:gap-2.5 transition-all">
+                        <Link to={`/${c.slug}/`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:gap-2.5 transition-all">
                           Learn More <ArrowRight className="w-4 h-4" />
                         </Link>
                       ) : (

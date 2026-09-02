@@ -7,7 +7,8 @@ import { Seo } from '@/components/common/Seo';
 import { Breadcrumbs } from '@/components/common/Breadcrumbs';
 import { CTASection } from '@/components/common/CTASection';
 import { site } from '@/data/site';
-import { getCmsIVPackages } from '@/data/cms';
+import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
+import { useCmsRealtime } from '@/lib/cmsLive';
 
 export interface Ingredient { abbr: string; name: string; description: string; dosage?: string; }
 export interface AddOn { name: string; price: string; description: string; }
@@ -44,15 +45,16 @@ export function IVPackageDetail({
   dosages: dosagesProp, bestFor, ingredients, addOns, related,
 }: IVPackageDetailProps) {
 
-  // Apply CMS override if admin has edited this static package
-  const [ov, setOv] = useState(() => getCmsIVPackages().find(p => p.id === `static-pkg-${slug}`));
+  const [ov, setOv] = useState<CmsIVPackage | undefined>();
 
-  useEffect(() => {
-    function reload() { setOv(getCmsIVPackages().find(p => p.id === `static-pkg-${slug}`)); }
-    window.addEventListener('storage', reload);
-    window.addEventListener('focus', reload);
-    return () => { window.removeEventListener('storage', reload); window.removeEventListener('focus', reload); };
-  }, [slug]);
+  function loadOverride() {
+    getCmsIVPackages().then(list => {
+      setOv(list.find(p => p.id === `static-pkg-${slug}`));
+    }).catch(() => setOv(undefined));
+  }
+
+  useEffect(() => { loadOverride(); }, [slug]);
+  useCmsRealtime(loadOverride);
 
   const name        = ov?.name        || nameProp;
   const price       = ov?.price       || priceProp;

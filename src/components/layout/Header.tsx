@@ -2,47 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Phone, X } from 'lucide-react';
-import { mainNav, type NavItem } from '@/data/navigation';
 import { site } from '@/data/site';
-import { getCmsIVPackages } from '@/data/cms';
+import { useLiveNav } from '@/lib/liveNav';
 
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const { pathname } = useLocation();
-
-  // Merge CMS IV packages into the IV Packages dropdown — re-read on every navigation and storage change
-  const [nav, setNav] = useState<NavItem[]>(mainNav);
-
-  function buildNav() {
-    const cmsPackages = getCmsIVPackages().filter(p => p.enabled);
-    if (cmsPackages.length === 0) { setNav(mainNav); return; }
-    setNav(mainNav.map(item => {
-      if (item.href !== '/iv-packages/') return item;
-      return {
-        ...item,
-        children: [
-          ...(item.children || []),
-          ...cmsPackages.map(p => ({ label: p.name, href: `/iv-packages/cms/${p.slug}/` })),
-        ],
-      };
-    }));
-  }
-
-  useEffect(() => {
-    buildNav();
-  }, [pathname]);
-
-  useEffect(() => {
-    // Re-read when localStorage changes (e.g. admin saves in same or different tab)
-    window.addEventListener('storage', buildNav);
-    window.addEventListener('focus', buildNav);
-    return () => {
-      window.removeEventListener('storage', buildNav);
-      window.removeEventListener('focus', buildNav);
-    };
-  }, []);
+  const nav = useLiveNav();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);

@@ -1,29 +1,38 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, CheckCircle2 } from 'lucide-react';
+import { Send, CheckCircle2, Loader2 } from 'lucide-react';
 import { fadeUp, viewport } from '@/animations/variants';
-import { saveContactMessage, generateId, type ContactMessage } from '@/data/appointments';
+import { saveContactMessage, generateId } from '@/data/appointments';
 
 export function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const msg: ContactMessage = {
-      id: generateId(),
-      name: form.name,
-      email: form.email,
-      phone: form.phone,
-      message: form.message,
-      status: 'new',
-      createdAt: new Date().toISOString(),
-    };
-    saveContactMessage(msg);
-    setSubmitted(true);
+    setError('');
+    setSending(true);
+    try {
+      await saveContactMessage({
+        id: generateId(),
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        message: form.message,
+        status: 'new',
+        createdAt: new Date().toISOString(),
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send your message. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   if (submitted) {
@@ -66,9 +75,10 @@ export function ContactForm() {
           placeholder="How can we help you?"
         />
       </div>
-      <button type="submit" className="btn-primary w-full sm:w-auto">
-        Send Message
-        <Send className="w-4 h-4" />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={sending} className="btn-primary w-full sm:w-auto disabled:opacity-60">
+        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        {sending ? 'Sending…' : 'Send Message'}
       </button>
     </motion.form>
   );

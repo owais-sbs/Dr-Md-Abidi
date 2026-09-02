@@ -1,17 +1,36 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CalendarDays, Phone, CheckCircle2, Plus, ArrowRight } from 'lucide-react';
+import { CalendarDays, Phone, CheckCircle2, Plus, Loader2 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { CTASection } from '@/components/common/CTASection';
 import { Breadcrumbs } from '@/components/common/Breadcrumbs';
-import { getCmsIVPackages } from '@/data/cms';
+import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
 import { fadeUp, staggerContainer, staggerFast, scaleIn, viewport } from '@/animations/variants';
 import { site } from '@/data/site';
 
 export function CmsIVPackageDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const pkg = getCmsIVPackages().find(p => p.slug === slug && p.enabled);
+  const [pkg, setPkg] = useState<CmsIVPackage | null | undefined>(undefined);
 
+  useEffect(() => {
+    let alive = true;
+    getCmsIVPackages()
+      .then(list => {
+        if (!alive) return;
+        setPkg(list.find(p => p.slug === slug && p.enabled && !p.id.startsWith('static-pkg-')) || null);
+      })
+      .catch(() => { if (alive) setPkg(null); });
+    return () => { alive = false; };
+  }, [slug]);
+
+  if (pkg === undefined) {
+    return (
+      <div className="min-h-[40vh] grid place-items-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-900" />
+      </div>
+    );
+  }
   if (!pkg) return <Navigate to="/iv-packages/" replace />;
 
   const bestFor = pkg.bestFor ? pkg.bestFor.split(',').map(s => s.trim()).filter(Boolean) : [];

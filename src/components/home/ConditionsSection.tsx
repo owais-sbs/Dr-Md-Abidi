@@ -7,23 +7,41 @@ import { SectionHeading } from '@/components/common/SectionHeading';
 import { ConditionCard } from '@/components/conditions/ConditionCard';
 import { conditions } from '@/data/conditions';
 import { getCmsConditions, type CmsCondition } from '@/data/cms';
+import { useCmsRealtime } from '@/lib/cmsLive';
 
 export function ConditionsSection() {
   const [cmsConditions, setCmsConditions] = useState<CmsCondition[]>([]);
+  const [overrides, setOverrides] = useState<CmsCondition[]>([]);
 
-  function loadCms() {
-    setCmsConditions(getCmsConditions().filter(c => c.enabled).slice(0, 3));
+  async function loadCms() {
+    try {
+      const all = await getCmsConditions();
+      setOverrides(all.filter(c => c.id.startsWith('static-cond-')));
+      setCmsConditions(all.filter(c => c.enabled && !c.id.startsWith('static-cond-')).slice(0, 3));
+    } catch {
+      setOverrides([]);
+      setCmsConditions([]);
+    }
   }
 
   useEffect(() => {
     loadCms();
-    window.addEventListener('focus', loadCms);
-    window.addEventListener('storage', loadCms);
-    return () => {
-      window.removeEventListener('focus', loadCms);
-      window.removeEventListener('storage', loadCms);
-    };
   }, []);
+  useCmsRealtime(loadCms);
+
+  const displayConditions = conditions.flatMap(c => {
+    const ov = overrides.find(o => o.slug === c.slug || o.id === `static-cond-${c.slug}`);
+    if (ov && !ov.enabled) return [];
+    if (!ov) return [c];
+    return [{
+      ...c,
+      title: ov.title || c.title,
+      shortDescription: ov.shortDescription || c.shortDescription,
+      cardImage: ov.cardImage || c.cardImage,
+      heroEyebrow: ov.heroEyebrow || c.heroEyebrow,
+      href: `/${ov.slug || c.slug}/`,
+    }];
+  });
   return (
     <section className="bg-ink-50 overflow-hidden">
       <div className="container-page py-20">
@@ -50,7 +68,7 @@ export function ConditionsSection() {
           viewport={viewport}
           className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {conditions.map((c, i) => (
+          {displayConditions.map((c, i) => (
             <motion.div
               key={c.slug}
               variants={scaleIn}
@@ -63,7 +81,7 @@ export function ConditionsSection() {
           ))}
           {/* CMS-added conditions */}
           {cmsConditions.map((c, i) => (
-            <motion.div key={c.id} variants={scaleIn} custom={conditions.length + i}
+            <motion.div key={c.id} variants={scaleIn} custom={displayConditions.length + i}
               whileHover={{ y: -6, boxShadow: '0 20px 48px -12px rgba(20,38,87,0.18)' }} transition={{ duration: 0.25 }}>
               <div className="card overflow-hidden flex flex-col group hover:shadow-card transition-shadow">
                 {c.cardImage && (
@@ -76,7 +94,7 @@ export function ConditionsSection() {
                 <div className="p-5 flex flex-col flex-1">
                   <h3 className="text-lg font-bold text-ink-900 group-hover:text-primary-700 transition-colors">{c.title}</h3>
                   <p className="mt-2 text-sm text-ink-600 leading-relaxed line-clamp-3">{c.shortDescription}</p>
-                  <Link to={`/cms-condition/${c.slug}/`} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 group-hover:gap-2.5 transition-all">
+                  <Link to={`/${c.slug}/`} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 group-hover:gap-2.5 transition-all">
                     Learn More <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>

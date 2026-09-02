@@ -7,6 +7,7 @@ import { Seo } from '@/components/common/Seo';
 import { PageHero } from '@/components/common/PageHero';
 import { CTASection } from '@/components/common/CTASection';
 import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
+import { useCmsRealtime } from '@/lib/cmsLive';
 
 const heroImg = 'https://images.pexels.com/photos/3683056/pexels-photo-3683056.jpeg?auto=compress&cs=tinysrgb&h=900&w=1600';
 
@@ -130,28 +131,29 @@ export function IVPackages() {
   const [cmsPackages,   setCmsPackages]   = useState<CmsIVPackage[]>([]);
   const [overridePkgs,  setOverridePkgs]  = useState<CmsIVPackage[]>([]);
 
-  function loadCms() {
-    const all = getCmsIVPackages().filter(p => p.enabled);
-    setOverridePkgs(all.filter(p => p.id.startsWith('static-pkg-')));
-    setCmsPackages(all.filter(p => !p.id.startsWith('static-pkg-')));
+  async function loadCms() {
+    try {
+      const all = (await getCmsIVPackages()).filter(p => p.enabled);
+      setOverridePkgs(all.filter(p => p.id.startsWith('static-pkg-')));
+      setCmsPackages(all.filter(p => !p.id.startsWith('static-pkg-')));
+    } catch {
+      setOverridePkgs([]);
+      setCmsPackages([]);
+    }
   }
 
   useEffect(() => {
     loadCms();
-    window.addEventListener('focus', loadCms);
-    window.addEventListener('storage', loadCms);
-    return () => {
-      window.removeEventListener('focus', loadCms);
-      window.removeEventListener('storage', loadCms);
-    };
   }, []);
+  useCmsRealtime(loadCms);
 
   // Merge overrides into static packages — override wins on matching slug
   const displayPackages = packages.map(p => {
-    const ov = overridePkgs.find(o => o.slug === p.slug);
+        const ov = overridePkgs.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
     if (!ov) return p;
     return {
       ...p,
+      slug: ov.slug || p.slug,
       name:       ov.name       || p.name,
       price:      ov.price      || p.price,
       totalValue: ov.totalValue ?? p.totalValue,
@@ -307,7 +309,7 @@ export function IVPackages() {
                       </div>
                     </div>
                     <p className="text-sm text-ink-500 leading-relaxed mb-4 flex-1">{pkg.tagline || pkg.description}</p>
-                    <Link to={`/iv-packages/cms/${pkg.slug}/`} className="inline-flex items-center gap-2 w-full justify-center bg-primary-900 hover:bg-primary-800 text-white font-semibold text-sm px-5 py-3 rounded-full transition-all">
+                    <Link to={`/iv-packages/${pkg.slug}/`} className="inline-flex items-center gap-2 w-full justify-center bg-primary-900 hover:bg-primary-800 text-white font-semibold text-sm px-5 py-3 rounded-full transition-all">
                       View Details <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>

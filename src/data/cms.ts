@@ -1,8 +1,4 @@
-/* ─────────────────────────────────────────────────────────
-   CMS Store — dynamic Conditions & IV Packages
-   Data is persisted in localStorage so changes made in
-   /admin are instantly reflected on the public website.
-───────────────────────────────────────────────────────── */
+import { supabase } from '@/lib/supabase';
 
 export interface CmsCondition {
   id: string;
@@ -11,10 +7,10 @@ export interface CmsCondition {
   href: string;
   heroEyebrow: string;
   shortDescription: string;
-  cardImage: string;      // path or URL
+  cardImage: string;
   heroImage: string;
-  overview: string;       // free-text, newline separated
-  symptoms: string;       // comma separated
+  overview: string;
+  symptoms: string;
   treatmentIntro: string;
   metaTitle: string;
   metaDescription: string;
@@ -30,56 +26,138 @@ export interface CmsIVPackage {
   price: number;
   totalValue?: number;
   badge?: string;
-  image: string;          // path or URL
+  image: string;
   tagline: string;
   description: string;
   dosages: string;
-  bestFor: string;        // comma separated
-  ingredients: string;    // newline sep: "abbr|name|description|dosage"
-  addOns: string;         // newline sep: "name|price|description"
+  bestFor: string;
+  ingredients: string;
+  addOns: string;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-const COND_KEY = 'cms_conditions';
-const PKG_KEY  = 'cms_iv_packages';
-
-/* ── Conditions ── */
-export function getCmsConditions(): CmsCondition[] {
-  try { return JSON.parse(localStorage.getItem(COND_KEY) || '[]'); } catch { return []; }
-}
-export function saveCmsCondition(c: CmsCondition): void {
-  const list = getCmsConditions().filter(x => x.id !== c.id);
-  list.push(c);
-  localStorage.setItem(COND_KEY, JSON.stringify(list));
-  // Notify other components in the same tab
-  window.dispatchEvent(new Event('storage'));
-}
-export function deleteCmsCondition(id: string): void {
-  const list = getCmsConditions().filter(x => x.id !== id);
-  localStorage.setItem(COND_KEY, JSON.stringify(list));
-  window.dispatchEvent(new Event('storage'));
+function throwApi(error: { message: string } | null, fallback: string): never {
+  throw new Error(error?.message || fallback);
 }
 
-/* ── IV Packages ── */
-export function getCmsIVPackages(): CmsIVPackage[] {
-  try { return JSON.parse(localStorage.getItem(PKG_KEY) || '[]'); } catch { return []; }
+function rowToCondition(row: Record<string, unknown>): CmsCondition {
+  return {
+    id: String(row.id),
+    slug: String(row.slug ?? ''),
+    title: String(row.title ?? ''),
+    href: String(row.href ?? ''),
+    heroEyebrow: String(row.hero_eyebrow ?? ''),
+    shortDescription: String(row.short_description ?? ''),
+    cardImage: String(row.card_image ?? ''),
+    heroImage: String(row.hero_image ?? ''),
+    overview: String(row.overview ?? ''),
+    symptoms: String(row.symptoms ?? ''),
+    treatmentIntro: String(row.treatment_intro ?? ''),
+    metaTitle: String(row.meta_title ?? ''),
+    metaDescription: String(row.meta_description ?? ''),
+    enabled: Boolean(row.enabled),
+    createdAt: String(row.created_at ?? ''),
+    updatedAt: String(row.updated_at ?? ''),
+  };
 }
-export function saveCmsIVPackage(p: CmsIVPackage): void {
-  const list = getCmsIVPackages().filter(x => x.id !== p.id);
-  list.push(p);
-  localStorage.setItem(PKG_KEY, JSON.stringify(list));
-  window.dispatchEvent(new Event('storage'));
+
+function rowToPackage(row: Record<string, unknown>): CmsIVPackage {
+  return {
+    id: String(row.id),
+    slug: String(row.slug ?? ''),
+    name: String(row.name ?? ''),
+    price: Number(row.price ?? 0),
+    totalValue: row.total_value == null ? undefined : Number(row.total_value),
+    badge: String(row.badge ?? ''),
+    image: String(row.image ?? ''),
+    tagline: String(row.tagline ?? ''),
+    description: String(row.description ?? ''),
+    dosages: String(row.dosages ?? ''),
+    bestFor: String(row.best_for ?? ''),
+    ingredients: String(row.ingredients ?? ''),
+    addOns: String(row.add_ons ?? ''),
+    enabled: Boolean(row.enabled),
+    createdAt: String(row.created_at ?? ''),
+    updatedAt: String(row.updated_at ?? ''),
+  };
 }
-export function deleteCmsIVPackage(id: string): void {
-  const list = getCmsIVPackages().filter(x => x.id !== id);
-  localStorage.setItem(PKG_KEY, JSON.stringify(list));
-  window.dispatchEvent(new Event('storage'));
+
+export async function getCmsConditions(): Promise<CmsCondition[]> {
+  const { data, error } = await supabase
+    .from('cms_conditions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throwApi(error, 'Could not load conditions.');
+  return (data || []).map(row => rowToCondition(row as Record<string, unknown>));
+}
+
+export async function saveCmsCondition(c: CmsCondition): Promise<void> {
+  const { error } = await supabase.from('cms_conditions').upsert({
+    id: c.id,
+    slug: c.slug,
+    title: c.title,
+    href: c.href || '',
+    hero_eyebrow: c.heroEyebrow || '',
+    short_description: c.shortDescription || '',
+    card_image: c.cardImage || '',
+    hero_image: c.heroImage || '',
+    overview: c.overview || '',
+    symptoms: c.symptoms || '',
+    treatment_intro: c.treatmentIntro || '',
+    meta_title: c.metaTitle || '',
+    meta_description: c.metaDescription || '',
+    enabled: c.enabled,
+    created_at: c.createdAt,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throwApi(error, 'Could not save the condition.');
+}
+
+export async function deleteCmsCondition(id: string): Promise<void> {
+  const { error } = await supabase.from('cms_conditions').delete().eq('id', id);
+  if (error) throwApi(error, 'Could not delete the condition.');
+}
+
+export async function getCmsIVPackages(): Promise<CmsIVPackage[]> {
+  const { data, error } = await supabase
+    .from('cms_iv_packages')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throwApi(error, 'Could not load IV packages.');
+  return (data || []).map(row => rowToPackage(row as Record<string, unknown>));
+}
+
+export async function saveCmsIVPackage(p: CmsIVPackage): Promise<void> {
+  const { error } = await supabase.from('cms_iv_packages').upsert({
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    price: p.price,
+    total_value: p.totalValue ?? null,
+    badge: p.badge || '',
+    image: p.image || '',
+    tagline: p.tagline || '',
+    description: p.description || '',
+    dosages: p.dosages || '',
+    best_for: p.bestFor || '',
+    ingredients: p.ingredients || '',
+    add_ons: p.addOns || '',
+    enabled: p.enabled,
+    created_at: p.createdAt,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throwApi(error, 'Could not save the IV package.');
+}
+
+export async function deleteCmsIVPackage(id: string): Promise<void> {
+  const { error } = await supabase.from('cms_iv_packages').delete().eq('id', id);
+  if (error) throwApi(error, 'Could not delete the IV package.');
 }
 
 export function newId(): string {
-  return `CMS-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+  return `CMS-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
 function slug(s: string): string {
