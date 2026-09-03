@@ -60,6 +60,12 @@ export interface BookedSlot {
   status: AppointmentStatus;
 }
 
+export interface TimeSlotAvailability {
+  time: string;
+  available: boolean;
+  reason?: 'booked' | 'blocked';
+}
+
 function throwApi(error: { message: string; code?: string } | null, fallback: string): never {
   if (error?.code === '23505') {
     throw new Error('This time slot was just booked. Please choose another time.');
@@ -320,6 +326,14 @@ export async function getAvailableDates(): Promise<{ date: string; location: 'Fr
 }
 
 export async function getAvailableTimesForSlot(date: string, location: 'Freehold' | 'Brick'): Promise<string[]> {
+  const slots = await getTimeSlotAvailability(date, location);
+  return slots.filter(slot => slot.available).map(slot => slot.time);
+}
+
+export async function getTimeSlotAvailability(
+  date: string,
+  location: 'Freehold' | 'Brick',
+): Promise<TimeSlotAvailability[]> {
   let cfg: SlotConfig = { date, location, dayBlocked: false, blockedTimes: [] };
   let booked: BookedSlot[] = [];
   try {
@@ -330,10 +344,16 @@ export async function getAvailableTimesForSlot(date: string, location: 'Freehold
   } catch (err) {
     console.warn('[appointments] Could not load slot availability:', err);
   }
-  const taken = booked
+  const taken = new Set(booked
     .filter(a => a.date === date && a.location === location)
-    .map(a => a.time);
-  return TIME_SLOTS.filter(t => !cfg.blockedTimes.includes(t) && !taken.includes(t));
+    .map(a => a.time));
+  return TIME_SLOTS.map(time => {
+    if (cfg.dayBlocked || cfg.blockedTimes.includes(time)) {
+      return { time, available: false, reason: 'blocked' };
+    }
+    if (taken.has(time)) return { time, available: false, reason: 'booked' };
+    return { time, available: true };
+  });
 }
 
 export const TIME_SLOTS = [

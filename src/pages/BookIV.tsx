@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import {
-  IV_PACKAGES, getAvailableDates, getAvailableTimesForSlot,
+  IV_PACKAGES, getAvailableDates, getTimeSlotAvailability, type TimeSlotAvailability,
 } from '@/data/appointments';
 import { getCmsIVPackages } from '@/data/cms';
 import { supabase, supabaseReady } from '@/lib/supabase';
@@ -95,7 +95,9 @@ export function BookIV() {
 
   const [allPackages, setAllPackages] = useState(IV_PACKAGES);
   const [dates, setDates] = useState<{ date: string; location: 'Freehold' | 'Brick' }[]>([]);
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlotAvailability[]>([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
+  const [slotNotice, setSlotNotice] = useState('');
   const [submitError, setSubmitError] = useState('');
 
   async function loadPackages() {
@@ -131,6 +133,7 @@ export function BookIV() {
     const channel = supabase
       .channel('booking-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_configs' }, () => { loadDates(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => { loadDates(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_iv_packages' }, () => { loadPackages(); })
       .subscribe();
     const onFocus = () => { loadDates(); loadPackages(); };
@@ -199,15 +202,38 @@ export function BookIV() {
 
   useEffect(() => {
     if (!selectedDate || !slotObj) {
-      setAvailableTimes([]);
+      setTimeSlots([]);
       return;
     }
     let alive = true;
-    getAvailableTimesForSlot(selectedDate, slotObj.location)
-      .then(times => { if (alive) setAvailableTimes(times); })
-      .catch(() => { if (alive) setAvailableTimes([]); });
+    setLoadingTimes(true);
+    getTimeSlotAvailability(selectedDate, slotObj.location)
+      .then(slots => {
+        if (!alive) return;
+        setTimeSlots(slots);
+        if (selectedTime && !slots.some(slot => slot.time === selectedTime && slot.available)) {
+          setSelectedTime('');
+          setSlotNotice('That time was just booked. Please choose another available time.');
+        }
+      })
+      .catch(() => { if (alive) setTimeSlots([]); })
+      .finally(() => { if (alive) setLoadingTimes(false); });
     return () => { alive = false; };
-  }, [selectedDate, slotObj?.location]);
+  }, [selectedDate, selectedTime, slotObj?.location]);
+
+  useEffect(() => {
+    if (!selectedDate || !slotObj) return;
+    const refresh = window.setInterval(() => {
+      getTimeSlotAvailability(selectedDate, slotObj.location).then(slots => {
+        setTimeSlots(slots);
+        if (selectedTime && !slots.some(slot => slot.time === selectedTime && slot.available)) {
+          setSelectedTime('');
+          setSlotNotice('That time was just booked. Please choose another available time.');
+        }
+      }).catch(() => undefined);
+    }, 30_000);
+    return () => window.clearInterval(refresh);
+  }, [selectedDate, selectedTime, slotObj?.location]);
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -353,7 +379,14 @@ export function BookIV() {
       try { sessionStorage.removeItem('iv-verify-token'); sessionStorage.removeItem('iv-verify-email'); } catch { /* ignore */ }
       setStep(4);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Could not submit your booking. Please try again.');
+      const message = err instanceof Error ? err.message : 'Could not submit your booking. Please try again.';
+      if (/time slot was just booked/i.test(message)) {
+        setSelectedTime('');
+        setSlotNotice('Sorry, another patient just booked that time. Please select a different available slot.');
+        setStep(1);
+      } else {
+        setSubmitError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -448,7 +481,7 @@ export function BookIV() {
                         <p className="text-sm text-ink-500 mb-5">Freehold: Mon / Wed / Fri &nbsp;·&nbsp; Brick: Tue / Thu</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
                           {dates.map(d => (
-                            <button key={d.date} type="button" onClick={() => { setSelectedDate(d.date); setSelectedTime(''); }}
+                            <button key={d.date} type="button" onClick={() => { setSelectedDate(d.date); setSelectedTime(''); setSlotNotice(''); }}
                               className={`rounded-xl border-2 px-3 py-3 text-left transition-all ${selectedDate === d.date ? 'border-primary-900 bg-primary-50' : 'border-ink-100 hover:border-primary-200'}`}>
                               <div className={`flex items-center gap-1 text-xs font-semibold mb-1 ${selectedDate === d.date ? 'text-primary-700' : 'text-ink-400'}`}>
                                 <MapPin className="w-3 h-3" /> {d.location}
@@ -461,14 +494,17 @@ export function BookIV() {
                         </div>
                         {selectedDate && (
                           <div>
-                            <div className="flex items-center gap-2 text-sm font-semibold text-ink-700 mb-3"><Clock className="w-4 h-4 text-sky-400" /> Select a time</div>
+                            <div className="flex items-center justify-between gap-2 text-sm font-semibold text-ink-700 mb-3"><span className="inline-flex items-center gap-2"><Clock className="w-4 h-4 text-sky-400" /> Select a time</span>{loadingTimes && <span className="text-xs font-medium text-ink-400">Updating availability…</span>}</div>
+                            {slotNotice && <div role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">{slotNotice}</div>}
                             <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                              {availableTimes.length === 0 ? (
+                              {timeSlots.length === 0 && !loadingTimes ? (
                                 <p className="col-span-4 text-sm text-ink-400">No times left for this date. Please pick another day.</p>
-                              ) : availableTimes.map(t => (
-                                <button key={t} type="button" onClick={() => setSelectedTime(t)}
-                                  className={`rounded-lg border-2 py-2 text-xs font-semibold transition-all ${selectedTime === t ? 'border-primary-900 bg-primary-900 text-white' : 'border-ink-100 hover:border-primary-300 text-ink-700'}`}>
-                                  {t}
+                              ) : timeSlots.map(slot => (
+                                <button key={slot.time} type="button" disabled={!slot.available} onClick={() => { setSelectedTime(slot.time); setSlotNotice(''); }}
+                                  aria-label={slot.available ? `${slot.time} available` : `${slot.time} ${slot.reason === 'booked' ? 'already booked' : 'unavailable'}`}
+                                  className={`rounded-lg border-2 py-2 px-1 text-xs font-semibold transition-all ${!slot.available ? 'cursor-not-allowed border-ink-100 bg-ink-50 text-ink-400 line-through' : selectedTime === slot.time ? 'border-primary-900 bg-primary-900 text-white' : 'border-ink-100 hover:border-primary-300 text-ink-700'}`}>
+                                  <span className="block">{slot.time}</span>
+                                  {!slot.available && <span className="block mt-0.5 text-[9px] no-underline">{slot.reason === 'booked' ? 'Booked' : 'Unavailable'}</span>}
                                 </button>
                               ))}
                             </div>
