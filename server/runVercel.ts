@@ -1,4 +1,4 @@
-import type { ApiResult } from './http';
+import type { ApiResult } from './http.js';
 
 type VercelReq = {
   method?: string;

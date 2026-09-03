@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { supabaseServiceKey, supabaseUrl } from './env';
+import { supabaseServiceKey, supabaseUrl } from './env.js';
 
 let admin: SupabaseClient | null = null;
 

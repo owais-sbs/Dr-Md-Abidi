@@ -1,6 +1,6 @@
-import { clientIp } from '../../server/http';
-import { handleOtpSend } from '../../server/otp';
-import { runVercel } from '../../server/runVercel';
+import { clientIp } from '../../server/http.js';
+import { handleOtpSend } from '../../server/otp.js';
+import { runVercel } from '../../server/runVercel.js';
 
 export const config = { maxDuration: 30 };
 

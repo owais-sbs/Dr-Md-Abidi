@@ -5,7 +5,7 @@ import {
   Shield, Syringe, Loader2, AlertCircle,
 } from 'lucide-react';
 import { site } from '@/data/site';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseReady } from '@/lib/supabase';
 
 const FEATURE_CARDS = [
   { title: 'Pending → Approved', body: 'Every booking request lands as Pending until you confirm it.', icon: CalendarDays, color: '#3b82f6', bg: '#eff6ff' },
@@ -34,6 +34,10 @@ export function AdminLogin({ onReady }: { onReady: () => void }) {
   const cards = useMemo(() => shuffle(FEATURE_CARDS), []);
 
   useEffect(() => {
+    // Do not make an auth request against the fallback client when the
+    // browser build has not received its public Supabase configuration.
+    if (!supabaseReady) return;
+
     let alive = true;
     supabase.auth.getSession().then(({ data }) => {
       if (alive && data.session) onReady();
@@ -44,19 +48,33 @@ export function AdminLogin({ onReady }: { onReady: () => void }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    setLoading(true);
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setLoading(false);
-    if (authError) {
-      setError(authError.message === 'Invalid login credentials'
-        ? 'Invalid email or password.'
-        : authError.message);
+
+    if (!supabaseReady) {
+      setError(
+        'Admin sign-in is not configured. Set VITE_SUPABASE_URL and ' +
+        'VITE_SUPABASE_ANON_KEY, then restart or redeploy the application.'
+      );
       return;
     }
-    onReady();
+
+    setLoading(true);
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (authError) {
+        setError(authError.message === 'Invalid login credentials'
+          ? 'Invalid email or password.'
+          : authError.message);
+        return;
+      }
+      onReady();
+    } catch {
+      setError('Unable to reach the authentication service. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

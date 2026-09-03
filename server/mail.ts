@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { setDefaultResultOrder } from 'node:dns';
-import { optionalEnv, smtpPass, smtpPort, smtpSecure } from './env';
+import { optionalEnv, smtpPass, smtpPort, smtpSecure } from './env.js';
 
 try {
   setDefaultResultOrder('ipv4first');

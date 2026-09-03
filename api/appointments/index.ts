@@ -1,5 +1,5 @@
-import { handleCreateAppointment } from '../../server/appointments';
-import { runVercel } from '../../server/runVercel';
+import { handleCreateAppointment } from '../../server/appointments.js';
+import { runVercel } from '../../server/runVercel.js';
 
 export const config = { maxDuration: 30 };
 

@@ -1,8 +1,8 @@
-import { findValidVerification, markVerificationUsed } from './otp';
-import { sendMail } from './mail';
-import { approvedEmail, rejectedEmail, requestReceivedEmail } from './templates';
-import { isAdminUser, supabaseAdmin } from './supabaseAdmin';
-import { fail, header, normalizeEmail, ok, type ApiResult } from './http';
+import { findValidVerification, markVerificationUsed } from './otp.js';
+import { sendMail } from './mail.js';
+import { approvedEmail, rejectedEmail, requestReceivedEmail } from './templates.js';
+import { isAdminUser, supabaseAdmin } from './supabaseAdmin.js';
+import { fail, header, normalizeEmail, ok, type ApiResult } from './http.js';
 
 const TIME_SLOTS = [
   '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM',

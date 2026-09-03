@@ -1,9 +1,9 @@
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
-import { otpPepper, missingServerEnv } from './env';
-import { sendMail } from './mail';
-import { otpEmail } from './templates';
-import { supabaseAdmin } from './supabaseAdmin';
-import { fail, normalizeEmail, ok, type ApiResult } from './http';
+import { otpPepper, missingServerEnv } from './env.js';
+import { sendMail } from './mail.js';
+import { otpEmail } from './templates.js';
+import { supabaseAdmin } from './supabaseAdmin.js';
+import { fail, normalizeEmail, ok, type ApiResult } from './http.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const TOKEN_TTL_MS = 45 * 60 * 1000;
