@@ -289,7 +289,14 @@ export function generateId(): string {
 }
 
 export async function getAvailableDates(): Promise<{ date: string; location: 'Freehold' | 'Brick' }[]> {
-  const configs = await getSlotConfigs();
+  // Fetch blocked-day configs — fall back to empty list so dates still show
+  let configs: SlotConfig[] = [];
+  try {
+    configs = await getSlotConfigs();
+  } catch (err) {
+    console.warn('[appointments] Could not load slot configs, showing all dates:', err);
+  }
+
   const results: { date: string; location: 'Freehold' | 'Brick' }[] = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -313,10 +320,16 @@ export async function getAvailableDates(): Promise<{ date: string; location: 'Fr
 }
 
 export async function getAvailableTimesForSlot(date: string, location: 'Freehold' | 'Brick'): Promise<string[]> {
-  const [cfg, booked] = await Promise.all([
-    getSlotConfig(date, location),
-    getBookedSlots(),
-  ]);
+  let cfg: SlotConfig = { date, location, dayBlocked: false, blockedTimes: [] };
+  let booked: BookedSlot[] = [];
+  try {
+    [cfg, booked] = await Promise.all([
+      getSlotConfig(date, location),
+      getBookedSlots(),
+    ]);
+  } catch (err) {
+    console.warn('[appointments] Could not load slot availability:', err);
+  }
   const taken = booked
     .filter(a => a.date === date && a.location === location)
     .map(a => a.time);

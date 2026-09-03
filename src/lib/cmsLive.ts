@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseReady } from '@/lib/supabase';
 
 /** Reload CMS-backed pages when admin saves conditions or IV packages. */
 export function useCmsRealtime(reload: () => void) {
@@ -7,6 +7,7 @@ export function useCmsRealtime(reload: () => void) {
   reloadRef.current = reload;
 
   useEffect(() => {
+    if (!supabaseReady) return;
     const channel = supabase
       .channel(`cms-content-${Math.random().toString(36).slice(2, 7)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_conditions' }, () => { reloadRef.current(); })

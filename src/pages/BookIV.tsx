@@ -10,7 +10,7 @@ import {
   IV_PACKAGES, getAvailableDates, getAvailableTimesForSlot,
 } from '@/data/appointments';
 import { getCmsIVPackages } from '@/data/cms';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseReady } from '@/lib/supabase';
 import { createBookingRequest, sendBookingOtp, verifyBookingOtp } from '@/lib/bookingApi';
 
 /* ─────────────────────────────────────────────
@@ -118,7 +118,8 @@ export function BookIV() {
   async function loadDates() {
     try {
       setDates(await getAvailableDates());
-    } catch {
+    } catch (err) {
+      console.error('[BookIV] loadDates failed:', err);
       setDates([]);
     }
   }
@@ -126,6 +127,7 @@ export function BookIV() {
   useEffect(() => {
     loadPackages();
     loadDates();
+    if (!supabaseReady) return;
     const channel = supabase
       .channel('booking-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_configs' }, () => { loadDates(); })
