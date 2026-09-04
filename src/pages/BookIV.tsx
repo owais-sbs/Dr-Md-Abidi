@@ -7,8 +7,9 @@ import {
 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import {
-  IV_PACKAGES, getAvailableDates, getTimeSlotAvailability, type TimeSlotAvailability,
+  getAvailableDates, getTimeSlotAvailability, type TimeSlotAvailability,
 } from '@/data/appointments';
+import { IV_PACKAGES } from '@/data/ivPackages';
 import { getCmsIVPackages } from '@/data/cms';
 import { supabase, supabaseReady } from '@/lib/supabase';
 import { createBookingRequest, sendBookingOtp, verifyBookingOtp } from '@/lib/bookingApi';

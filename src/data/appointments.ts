@@ -363,14 +363,4 @@ export const TIME_SLOTS = [
   '4:00 PM', '4:30 PM',
 ];
 
-export const IV_PACKAGES = [
-  { name: 'Saline',                 slug: 'saline',                 price: 125 },
-  { name: 'MTO',                    slug: 'mto',                    price: 160 },
-  { name: 'The Myers',              slug: 'the-myers',              price: 200 },
-  { name: 'The After Party',        slug: 'the-after-party',        price: 175 },
-  { name: 'Go With The Flow',       slug: 'go-with-the-flow',       price: 225 },
-  { name: 'The Migraine Minimizer', slug: 'the-migraine-minimizer', price: 225 },
-  { name: 'The Defensive Line',     slug: 'the-defensive-line',     price: 300 },
-  { name: 'The Kitchen Sink',       slug: 'the-kitchen-sink',       price: 400 },
-  { name: 'The greNADe',            slug: 'the-grenade',            price: 450 },
-];
+export { IV_PACKAGES } from './ivPackages';

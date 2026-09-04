@@ -25,7 +25,7 @@ import {
   type CmsCondition, type CmsIVPackage,
 } from '@/data/cms';
 import { conditions as staticConditions } from '@/data/conditions';
-import { IV_PACKAGES as staticIVPackages } from '@/data/appointments';
+import { IV_PACKAGES as staticIVPackages } from '@/data/ivPackages';
 import { site } from '@/data/site';
 import { supabase } from '@/lib/supabase';
 import { AdminLogin } from '@/pages/AdminLogin';
@@ -897,6 +897,11 @@ export function AdminDashboard() {
   }
 
   const todayStr = isoDate(new Date());
+  const visibleConditionCount = staticConditions.filter(c => {
+    const override = conditions.find(o => o.slug === c.slug || o.id === `static-cond-${c.slug}`);
+    return !override || override.enabled;
+  }).length + conditions.filter(c => c.enabled && !c.id.startsWith('static-cond-')).length;
+  const visiblePackageCount = staticIVPackages.length + ivPackages.filter(p => p.enabled && !p.id.startsWith('static-pkg-')).length;
   const counts = {
     total:       appointments.length,
     pending:     appointments.filter(a=>a.status==='pending').length,
@@ -907,8 +912,8 @@ export function AdminDashboard() {
     rejected:    appointments.filter(a=>a.status==='rejected').length,
     today:       appointments.filter(a=>a.date===todayStr && a.status==='approved').length,
     newMessages: messages.filter(m=>m.status==='new').length,
-    liveConditions: staticConditions.length + conditions.filter(c=>c.enabled && !c.id.startsWith('static-')).length,
-    livePackages: staticIVPackages.length + ivPackages.filter(p=>p.enabled && !p.id.startsWith('static-')).length,
+    liveConditions: visibleConditionCount,
+    livePackages: visiblePackageCount,
   };
 
   const filteredAppts = appointments.filter(a => {
