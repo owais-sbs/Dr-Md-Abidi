@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,7 +8,9 @@ import {
   Phone, TrendingUp, ArrowUpRight, Inbox, Activity, Plus, Pencil,
   Trash2, ToggleLeft, ToggleRight, Save, AlertCircle, Lock, Unlock,
   ChevronLeft, ChevronRight, List, CalendarRange, StickyNote, Loader2,
+  UploadCloud, ImageIcon,
 } from 'lucide-react';
+import { uploadPackageImage, deletePackageImage } from '@/lib/imageUpload';
 import { Seo } from '@/components/common/Seo';
 import {
   getAppointments, updateAppointment,
@@ -706,6 +708,131 @@ function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; 
   );
 }
 
+/* ── Image Upload Widget (used inside IVPackageForm) ── */
+function ImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState('');
+  const [dragOver, setDragOver] = useState(false);
+
+  async function processFile(file: File) {
+    const allowed = ['image/jpeg','image/jpg','image/png','image/webp','image/gif'];
+    if (!allowed.includes(file.type)) { setUploadErr('Only JPG, PNG, WebP or GIF images are allowed.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setUploadErr('File must be under 5 MB.'); return; }
+    setUploadErr('');
+    setUploading(true);
+    try {
+      // Delete old image from storage if it's one we uploaded
+      if (value) await deletePackageImage(value);
+      const url = await uploadPackageImage(file);
+      onChange(url);
+    } catch (e) {
+      setUploadErr(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+    e.target.value = '';
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  }
+
+  async function clearImage() {
+    if (value) await deletePackageImage(value);
+    onChange('');
+  }
+
+  return (
+    <div className="sm:col-span-2">
+      <label className="block text-xs font-semibold text-ink-700 mb-1.5">Package Image</label>
+
+      {/* Preview */}
+      {value && (
+        <div className="relative mb-3 rounded-xl overflow-hidden border border-ink-200 bg-ink-50" style={{height:'180px'}}>
+          <img src={value} alt="Package" className="w-full h-full object-cover"/>
+          <button
+            type="button"
+            onClick={clearImage}
+            className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 border border-red-200 text-red-500 rounded-full w-7 h-7 flex items-center justify-center shadow transition-colors"
+            title="Remove image"
+          >
+            <X className="w-3.5 h-3.5"/>
+          </button>
+          <div className="absolute bottom-2 left-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="bg-white/90 hover:bg-white border border-ink-200 text-ink-700 rounded-full px-3 py-1 text-xs font-semibold shadow flex items-center gap-1.5 transition-colors"
+            >
+              <UploadCloud className="w-3 h-3"/> Replace
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Drop zone (shown when no image or as fallback) */}
+      {!value && (
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors py-10 ${
+            dragOver
+              ? 'border-primary-600 bg-primary-50'
+              : 'border-ink-200 hover:border-primary-400 bg-ink-50 hover:bg-primary-50/40'
+          }`}
+        >
+          {uploading ? (
+            <>
+              <Loader2 className="w-7 h-7 text-primary-600 animate-spin"/>
+              <p className="text-xs font-medium text-ink-500">Uploading…</p>
+            </>
+          ) : (
+            <>
+              <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
+                <ImageIcon className="w-6 h-6 text-primary-600"/>
+              </div>
+              <p className="text-sm font-semibold text-ink-700">Click or drag &amp; drop to upload</p>
+              <p className="text-xs text-ink-400">JPG, PNG, WebP, GIF — max 5 MB</p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Hidden file input */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={onFileInput}
+      />
+
+      {/* Upload progress overlay when replacing */}
+      {value && uploading && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-primary-700 font-medium">
+          <Loader2 className="w-3.5 h-3.5 animate-spin"/> Uploading new image…
+        </div>
+      )}
+
+      {uploadErr && (
+        <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0"/>{uploadErr}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function IVPackageForm({ initial, onSave, onCancel }: { initial?: CmsIVPackage; onSave:(p:CmsIVPackage)=>void|Promise<void>; onCancel:()=>void }) {
   const [f,setF]=useState(initial?{...initial}:{...EMPTY_PKG});
   const [err,setErr]=useState('');
@@ -749,7 +876,8 @@ function IVPackageForm({ initial, onSave, onCancel }: { initial?: CmsIVPackage; 
         <div><label className={lbl}>Price ($) *</label><input name="price" type="number" required value={f.price||''} onChange={handle} className={inp}/></div>
         <div><label className={lbl}>Total Value ($)</label><input name="totalValue" type="number" value={f.totalValue||''} onChange={handle} className={inp}/></div>
         <div><label className={lbl}>Badge</label><input name="badge" value={f.badge||''} onChange={handle} className={inp} placeholder="Most Popular"/></div>
-        <div><label className={lbl}>Image</label><input name="image" value={f.image} onChange={handle} className={inp} placeholder="/image.png"/></div>
+        {/* Image upload widget — replaces the old URL text field */}
+        <ImageUploader value={f.image} onChange={url => setF(p => ({ ...p, image: url }))}/>
         <div className="sm:col-span-2"><label className={lbl}>Tagline</label><input name="tagline" value={f.tagline} onChange={handle} className={inp}/></div>
         <div className="sm:col-span-2"><label className={lbl}>Description</label><textarea name="description" rows={3} value={f.description} onChange={handle} className={inp+" resize-none"}/></div>
         <div className="sm:col-span-2"><label className={lbl}>Dosages</label><input name="dosages" value={f.dosages} onChange={handle} className={inp}/></div>
@@ -1137,7 +1265,7 @@ export function AdminDashboard() {
                 {!editingPkg && (
                 <>
                 <div>
-                  <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Built-in (9)</p>
+                  <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Built-in ({staticIVPackages.length})</p>
                   <div className="grid gap-2">
                     {staticIVPackages.map(p=>{
                       const stableId=`static-pkg-${p.slug}`;

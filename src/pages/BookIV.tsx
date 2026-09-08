@@ -106,11 +106,11 @@ export function BookIV() {
       const all = await getCmsIVPackages();
       const cms = all
         .filter(p => p.enabled && !p.id.startsWith('static-pkg-'))
-        .map(p => ({ name: p.name, slug: p.slug, price: p.price }));
+        .map(p => ({ name: p.name, slug: p.slug, price: p.price, image: p.image || '' }));
       const overrides = all.filter(p => p.enabled && p.id.startsWith('static-pkg-'));
       const merged = IV_PACKAGES.map(p => {
         const ov = overrides.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
-        return ov ? { name: ov.name || p.name, slug: ov.slug || p.slug, price: ov.price || p.price } : p;
+        return ov ? { name: ov.name || p.name, slug: ov.slug || p.slug, price: ov.price || p.price, image: ov.image || p.image } : p;
       });
       setAllPackages([...merged, ...cms]);
     } catch {
@@ -439,25 +439,64 @@ export function BookIV() {
                       <div className="bg-white rounded-2xl shadow-soft border border-ink-100 p-8">
                         <h2 className="text-xl font-serif font-bold text-ink-900 mb-1">Select Your IV Package</h2>
                         <p className="text-sm text-ink-500 mb-6">Choose the IV infusion type you'd like to book</p>
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          {allPackages.map(pkg => (
-                            <button key={pkg.slug} type="button" onClick={() => setSelectedPkg(pkg.slug)}
-                              className={`flex items-center justify-between px-5 py-4 rounded-xl border-2 transition-all text-left ${
-                                selectedPkg === pkg.slug ? 'border-primary-900 bg-primary-50' : 'border-ink-100 hover:border-primary-200 bg-white'
-                              }`}
-                            >
-                              <div>
-                                <div className={`font-semibold text-sm ${selectedPkg === pkg.slug ? 'text-primary-900' : 'text-ink-800'}`}>{pkg.name}</div>
-                                <div className="text-xs text-ink-400 mt-0.5">IV Therapy Package</div>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className={`font-black text-lg ${selectedPkg === pkg.slug ? 'text-primary-900' : 'text-ink-600'}`}>${pkg.price}</span>
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPkg === pkg.slug ? 'border-primary-900 bg-primary-900' : 'border-ink-300'}`}>
-                                  {selectedPkg === pkg.slug && <CheckCircle2 className="w-3 h-3 text-white" />}
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          {allPackages.map(pkg => {
+                            const isSelected = selectedPkg === pkg.slug;
+                            return (
+                              <button
+                                key={pkg.slug}
+                                type="button"
+                                onClick={() => setSelectedPkg(pkg.slug)}
+                                className={`flex flex-col rounded-2xl border-2 overflow-hidden transition-all text-left shadow-sm hover:shadow-md ${
+                                  isSelected
+                                    ? 'border-primary-900 ring-2 ring-primary-200'
+                                    : 'border-ink-100 hover:border-primary-300'
+                                }`}
+                              >
+                                {/* Image */}
+                                <div className="relative w-full bg-ink-100" style={{ height: '140px' }}>
+                                  {pkg.image ? (
+                                    <img
+                                      src={pkg.image}
+                                      alt={pkg.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-sky-100">
+                                      <Syringe className="w-10 h-10 text-primary-200" />
+                                    </div>
+                                  )}
+                                  {/* Badge */}
+                                  {'badge' in pkg && pkg.badge && (
+                                    <span className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                      {pkg.badge}
+                                    </span>
+                                  )}
+                                  {/* Selected tick */}
+                                  {isSelected && (
+                                    <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary-900 flex items-center justify-center shadow">
+                                      <CheckCircle2 className="w-4 h-4 text-white" />
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            </button>
-                          ))}
+
+                                {/* Info */}
+                                <div className={`flex items-center justify-between px-4 py-3 ${
+                                  isSelected ? 'bg-primary-50' : 'bg-white'
+                                }`}>
+                                  <div className="min-w-0">
+                                    <div className={`font-semibold text-sm truncate ${
+                                      isSelected ? 'text-primary-900' : 'text-ink-800'
+                                    }`}>{pkg.name}</div>
+                                    <div className="text-xs text-ink-400 mt-0.5">IV Therapy Package</div>
+                                  </div>
+                                  <span className={`font-black text-lg shrink-0 ml-3 ${
+                                    isSelected ? 'text-primary-900' : 'text-ink-600'
+                                  }`}>${pkg.price}</span>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                         <button onClick={() => selectedPkg && setStep(1)} disabled={!selectedPkg}
                           className="mt-6 w-full inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-3.5 rounded-full transition-all text-sm">

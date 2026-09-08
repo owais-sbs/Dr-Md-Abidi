@@ -1,9 +1,9 @@
 import { IVPackageDetail } from '@/components/iv/IVPackageDetail';
 
 const related = [
-  { name: 'The Myers', price: 200, image: '/Mysers.png', description: 'Classic vitamin cocktail to replenish vital nutrients and boost energy.', href: '/iv-packages/the-myers/' },
-  { name: 'The Migraine Minimizer', price: 225, totalValue: 250, image: '/migranine minimizer.png', description: 'Instant migraine and headache relief cocktail.', href: '/iv-packages/the-migraine-minimizer/' },
-  { name: 'Saline', price: 125, image: '/saline.png', description: 'Fast, effective hydration with our saline solution.', href: '/iv-packages/saline/' },
+  { name: 'Myers Cocktail', price: 375, image: '/Mysers.png', description: 'Classic vitamin cocktail to replenish vital nutrients.', href: '/iv-packages/myers-cocktail/' },
+  { name: 'Power-Up', price: 325, image: '/power-up.jpg', description: 'Energy and metabolic support infusion.', href: '/iv-packages/power-up/' },
+  { name: '1,000 cc Saline Hydration', price: 200, image: '/saline.png', description: 'Fast, effective hydration with our saline solution.', href: '/iv-packages/saline/' },
 ];
 
 export function MTO() {

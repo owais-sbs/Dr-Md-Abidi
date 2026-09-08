@@ -1,9 +1,9 @@
 import { IVPackageDetail } from '@/components/iv/IVPackageDetail';
 
 const related = [
-  { name: 'The Migraine Minimizer', price: 225, totalValue: 250, image: '/migranine minimizer.png', description: 'Instant migraine and headache relief cocktail.', href: '/iv-packages/the-migraine-minimizer/' },
-  { name: 'The After Party', price: 175, image: '/The after party.png', description: 'Detox and rehydrate after a long night out.', href: '/iv-packages/the-after-party/' },
-  { name: 'Saline', price: 125, image: '/saline.png', description: 'Fast, effective hydration with our saline solution.', href: '/iv-packages/saline/' },
+  { name: 'Fountain Of Youth', price: 350, image: '/fountain-of-youth.jpg', description: 'Anti-aging and mitochondrial support.', href: '/iv-packages/fountain-of-youth/' },
+  { name: 'Myers Cocktail', price: 375, image: '/Mysers.png', description: 'Overall wellness and energy infusion.', href: '/iv-packages/myers-cocktail/' },
+  { name: 'Power-Up', price: 325, image: '/power-up.jpg', description: 'Boost energy and metabolic health.', href: '/iv-packages/power-up/' },
 ];
 
 export function GoWithTheFlow() {
@@ -11,32 +11,27 @@ export function GoWithTheFlow() {
     <IVPackageDetail
       slug="go-with-the-flow"
       name="Go With The Flow"
-      price={225}
-      totalValue={275}
+      price={350}
+      badge="PMS Relief"
       image="/go with the flow.png"
-      heroSubtitle="That Time Of The Month? Just Go With The Flow."
-      tagline="It's that time of the month and you are feeling miserable. Life doesn't wait. Designed specifically with PMS symptoms in mind to get you feeling better, fast."
-      description="We know that time of the month can make you feel awful and the truth is, we know that you don't have the time to feel bad. This package was designed with women in mind. Go with the Flow contains maximum dose Magnesium, B12, B Complex, Zinc, Toradol, and Zofran. These ingredients help combat those nasty PMS symptoms like headache, cramps, bloating, fatigue, and nausea to get you back to your busy life."
-      dosages="1000mg Magnesium, 1ml Zinc, 1ml B Complex, 1ml B12, 30mg Toradol, 4mg Zofran"
-      bestFor={['Menstrual Cramps', 'Headache', 'Bloating', 'Fatigue', 'Nausea']}
+      heroSubtitle="PMS Symptom Relief & Nutrient Hydration"
+      tagline="Formulated to help ease the discomfort of PMS, reduce bloating, irritability and cramping."
+      description="Formulated to help ease the discomfort of PMS, this infusion is designed to reduce bloating, irritability and cramping. Packed with high-quality nutrients that supports mood, hydration and muscle relaxation, providing a well-rounded approach to symptom relief."
+      dosages="Calcium chloride, Hydroxocobalamin (B12), Magnesium chloride, Thiamine hydrochloride (B1), Niacinamide (B3), Riboflavin 5 phosphate (B2), Dexpanthenol (B5), Pyridoxine hydrochloride (B6)"
+      bestFor={['PMS Relief', 'Cramping Relief', 'Bloating Reduction', 'Mood Support', 'Muscle Relaxation', 'Hydration']}
       ingredients={[
-        { abbr: 'MG', name: 'Magnesium', dosage: '1000mg', description: 'Supports the circulatory system, keeps blood pressure normal, strengthens bones, regulates nerve function and relieves muscle cramps.' },
-        { abbr: 'B12', name: 'Vitamin B12', dosage: '1ml', description: 'Maintains nerve and blood cell health. Reduces fatigue, improves brain function and regulates mood and metabolism.' },
-        { abbr: 'B', name: 'Vitamin B Complex', dosage: '1ml', description: 'Includes riboflavin, folic acid, niacin and B6. Boosts energy, improves brain function and regulates metabolism and mood.' },
-        { abbr: 'Z', name: 'Zinc', dosage: '1ml', description: 'Essential mineral that helps the body resist infection and aids in tissue repair. Improves skin and vision and regulates hormones.' },
-        { abbr: 'T', name: 'Toradol', dosage: '30mg', description: 'Non-steroidal anti-inflammatory used to relieve pain, reduce inflammation and combat migraines. Not suitable during pregnancy.' },
-        { abbr: 'Z', name: 'Zofran', dosage: '4mg', description: 'Relieves nausea and vomiting. Can be given during pregnancy (second and third trimester) for nausea symptoms.' },
+        { abbr: 'CA', name: 'Calcium chloride', description: 'Supports muscle contractions and nerve signaling to ease cramps.' },
+        { abbr: 'B12', name: 'Hydroxocobalamin (B12)', description: 'Sustained-release B12 for energy, mood balance, and nerve support.' },
+        { abbr: 'MG', name: 'Magnesium chloride', description: 'Promotes muscle relaxation, reduces cramping, and supports circulatory health.' },
+        { abbr: 'B1', name: 'Thiamine hydrochloride (B1)', description: 'Supports nerve function and cellular energy synthesis.' },
+        { abbr: 'B3', name: 'Niacinamide (B3)', description: 'Supports cellular health, skin vitality, and energy production.' },
+        { abbr: 'B2', name: 'Riboflavin 5 phosphate (B2)', description: 'Promotes cellular energy and antioxidant balance.' },
+        { abbr: 'B5', name: 'Dexpanthenol (B5)', description: 'Supports adrenal health, hormone balance, and energy metabolism.' },
+        { abbr: 'B6', name: 'Pyridoxine hydrochloride (B6)', description: 'Helps regulate mood, water retention, and neurotransmitter balance.' },
       ]}
       addOns={[
-        { name: 'Glutathione', price: '+$25', description: 'The liver detoxer antioxidant — boosts immunity, improves skin health and fights oxidative stress.' },
-        { name: 'Intramuscular Shots', price: '+$30 each', description: 'IM injections: Vitamin B12, Toradol, or Vitamin D.' },
-        { name: 'Magnesium', price: '+$25', description: 'Extra magnesium for additional muscle cramp relief and circulatory support.' },
-        { name: 'NAD+', price: '+$1/mg', description: 'Fights chronic fatigue, brain fog and inflammation. Revolutionary cellular energy coenzyme.' },
-        { name: 'Toradol', price: '+$25', description: 'Additional anti-inflammatory for enhanced pain relief.' },
-        { name: 'Vitamin B Complex', price: '+$25', description: 'Extra B complex for energy and metabolism.' },
-        { name: 'Vitamin B12', price: '+$25', description: 'Additional B12 to further combat fatigue.' },
-        { name: 'Pepcid', price: '+$25', description: 'Prevents excess stomach acid for reflux or heartburn.' },
-        { name: 'Benadryl', price: '+$25', description: 'Anti-histamine for allergy symptoms, insomnia and nausea.' },
+        { name: 'Glutathione Add-On', price: '$50', description: 'A powerful antioxidant that boosts immunity, improves skin health, and protects cells from oxidative stress.' },
+        { name: 'NAD Add-On', price: '$1/MG', description: 'Revolutionary coenzyme that supports cellular energy, brain function, anti-aging, and circadian regulation.' },
       ]}
       related={related}
     />

@@ -1,9 +1,9 @@
 import { IVPackageDetail } from '@/components/iv/IVPackageDetail';
 
 const related = [
-  { name: 'The Kitchen Sink', price: 400, image: '/The kitchen sink.png', description: 'Maximum dose Vitamin C for acute illness support.', href: '/iv-packages/the-kitchen-sink/' },
-  { name: 'The Myers', price: 200, image: '/Mysers.png', description: 'Classic vitamin cocktail for energy and immune support.', href: '/iv-packages/the-myers/' },
-  { name: 'The greNADe', price: 450, image: '/The grenade.png', description: 'Myers cocktail with revolutionary NAD+ for peak performance.', href: '/iv-packages/the-grenade/' },
+  { name: 'Immunify', price: 325, image: '/immunify.jpg', description: 'Optimal immune system support.', href: '/iv-packages/immunify/' },
+  { name: 'Myers Cocktail', price: 375, image: '/Mysers.png', description: 'Classic vitamin cocktail for energy and immune support.', href: '/iv-packages/myers-cocktail/' },
+  { name: 'Power-Up', price: 325, image: '/power-up.jpg', description: 'Boost energy and metabolic health.', href: '/iv-packages/power-up/' },
 ];
 
 export function TheDefensiveLine() {

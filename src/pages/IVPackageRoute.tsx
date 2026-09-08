@@ -5,20 +5,29 @@ import { getCmsIVPackages } from '@/data/cms';
 import { CmsIVPackageDetail } from '@/pages/CmsIVPackageDetail';
 import { Saline } from '@/pages/iv/Saline';
 import { TheMyers } from '@/pages/iv/TheMyers';
+import { MyersCocktail } from '@/pages/iv/MyersCocktail';
+import { PowerUp } from '@/pages/iv/PowerUp';
+import { Immunify } from '@/pages/iv/Immunify';
+import { FountainOfYouth } from '@/pages/iv/FountainOfYouth';
+import { GoWithTheFlow } from '@/pages/iv/GoWithTheFlow';
 import { TheAfterParty } from '@/pages/iv/TheAfterParty';
 import { MTO } from '@/pages/iv/MTO';
-import { GoWithTheFlow } from '@/pages/iv/GoWithTheFlow';
 import { TheMigraineMinimizer } from '@/pages/iv/TheMigraineMinimizer';
 import { TheDefensiveLine } from '@/pages/iv/TheDefensiveLine';
 import { TheKitchenSink } from '@/pages/iv/TheKitchenSink';
 import { TheGrenade } from '@/pages/iv/TheGrenade';
 
 const STATIC_IV: Record<string, React.ComponentType> = {
-  saline: Saline,
+  'power-up': PowerUp,
+  immunify: Immunify,
+  'go-with-the-flow': GoWithTheFlow,
+  'fountain-of-youth': FountainOfYouth,
+  'myers-cocktail': MyersCocktail,
   'the-myers': TheMyers,
+  saline: Saline,
+  '1000-cc-saline-hydration': Saline,
   'the-after-party': TheAfterParty,
   mto: MTO,
-  'go-with-the-flow': GoWithTheFlow,
   'the-migraine-minimizer': TheMigraineMinimizer,
   'the-defensive-line': TheDefensiveLine,
   'the-kitchen-sink': TheKitchenSink,

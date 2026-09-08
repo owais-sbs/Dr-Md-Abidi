@@ -1,9 +1,9 @@
 import { IVPackageDetail } from '@/components/iv/IVPackageDetail';
 
 const related = [
-  { name: 'The After Party', price: 175, image: '/The after party.png', description: 'Detox and rehydrate after a long night out.', href: '/iv-packages/the-after-party/' },
-  { name: 'Go With The Flow', price: 225, totalValue: 275, image: '/go with the flow.png', description: 'Designed specifically for PMS symptoms.', href: '/iv-packages/go-with-the-flow/' },
-  { name: 'Saline', price: 125, image: '/saline.png', description: 'Fast, effective hydration anywhere.', href: '/iv-packages/saline/' },
+  { name: 'Power-Up', price: 325, image: '/power-up.jpg', description: 'Energy and metabolic health infusion.', href: '/iv-packages/power-up/' },
+  { name: 'Go With The Flow', price: 350, image: '/go with the flow.png', description: 'Designed specifically for PMS symptom relief.', href: '/iv-packages/go-with-the-flow/' },
+  { name: '1,000 cc Saline Hydration', price: 200, image: '/saline.png', description: 'Fast, effective hydration anywhere.', href: '/iv-packages/saline/' },
 ];
 
 export function TheMigraineMinimizer() {

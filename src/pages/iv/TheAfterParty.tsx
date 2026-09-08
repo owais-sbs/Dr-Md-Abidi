@@ -1,9 +1,9 @@
 import { IVPackageDetail } from '@/components/iv/IVPackageDetail';
 
 const related = [
-  { name: 'The Migraine Minimizer', price: 225, totalValue: 250, image: '/migranine minimizer.png', description: 'Instant relief with our specially designed migraine cocktail.', href: '/iv-packages/the-migraine-minimizer/' },
-  { name: 'Go With The Flow', price: 225, totalValue: 275, image: '/go with the flow.png', description: 'Designed specifically for PMS symptoms — get back to life fast.', href: '/iv-packages/go-with-the-flow/' },
-  { name: 'Saline', price: 125, image: '/saline.png', description: 'Fast, effective hydration anywhere with our saline solution.', href: '/iv-packages/saline/' },
+  { name: 'Power-Up', price: 325, image: '/power-up.jpg', description: 'Energy and metabolic health infusion.', href: '/iv-packages/power-up/' },
+  { name: 'Go With The Flow', price: 350, image: '/go with the flow.png', description: 'Designed specifically for PMS symptom relief.', href: '/iv-packages/go-with-the-flow/' },
+  { name: '1,000 cc Saline Hydration', price: 200, image: '/saline.png', description: 'Fast, effective hydration anywhere.', href: '/iv-packages/saline/' },
 ];
 
 export function TheAfterParty() {

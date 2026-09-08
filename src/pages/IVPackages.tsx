@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import { CheckCircle2, ArrowRight, Star } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Star, Plus, Tag } from 'lucide-react';
 import { fadeUp, staggerContainer, staggerFast, scaleIn, viewport } from '@/animations/variants';
 import { Seo } from '@/components/common/Seo';
 import { PageHero } from '@/components/common/PageHero';
 import { CTASection } from '@/components/common/CTASection';
-import { IV_PACKAGES } from '@/data/ivPackages';
+import { IV_PACKAGES, IV_ADD_ONS, IV_PACKAGE_DEALS } from '@/data/ivPackages';
 import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
 import { useCmsRealtime } from '@/lib/cmsLive';
 
@@ -48,7 +48,7 @@ export function IVPackages() {
     <>
       <Seo
         title="IV Therapy Packages | MD Abidi Arthritis Institute"
-        description="Browse our full range of IV therapy packages - from hydration and immune support to migraine relief and NAD+ therapy. Delivered by registered nurses."
+        description="Browse our official IV therapy packages - Power-Up, Immunify, Go With The Flow, Fountain Of Youth, Myers Cocktail, 1,000 cc Saline, and specialized add-ons. Administered by registered nurses."
       />
       <PageHero
         eyebrow="IV Packages"
@@ -61,7 +61,7 @@ export function IVPackages() {
       <div className="bg-sky-50 border-b border-sky-100">
         <div className="container-page py-4">
           <p className="text-xs text-sky-800 text-center leading-relaxed max-w-3xl mx-auto">
-            <strong>Disclaimer:</strong> Lactated Ringers may be used as an alternative to Normal Saline due to the ongoing national fluid shortage. Both are commonly used intravenous fluids and are safe and effective for hydration and electrolyte replacement.
+            <strong>Disclaimer:</strong> All IV Hydration infusions are strictly out of pocket and will not be covered by insurance. Lactated Ringers may be used as an alternative to Normal Saline due to the ongoing national fluid shortage. Both are commonly used intravenous fluids and are safe and effective for hydration and electrolyte replacement.
           </p>
         </div>
       </div>
@@ -102,7 +102,7 @@ export function IVPackages() {
                 className="group"
               >
                 <div className="card overflow-hidden h-full flex flex-col">
-                  <div className="relative aspect-[16/10] overflow-hidden">
+                  <div className="relative aspect-[16/10] overflow-hidden bg-sky-50">
                     <img
                       src={pkg.image}
                       alt={pkg.name}
@@ -138,6 +138,11 @@ export function IVPackages() {
                           <span>{item}</span>
                         </li>
                       ))}
+                      {pkg.includes.length > 4 && (
+                        <li className="text-xs font-semibold text-primary-700 pl-6">
+                          +{pkg.includes.length - 4} more ingredients
+                        </li>
+                      )}
                     </ul>
                     <Link
                       to={`/book-iv/?package=${pkg.slug}`}
@@ -146,6 +151,113 @@ export function IVPackages() {
                       Book This Package <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── Add-Ons Section ── */}
+      <section className="bg-sky-50/50 border-t border-sky-100 py-16 sm:py-20">
+        <div className="container-page">
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={viewport}
+            className="text-center max-w-2xl mx-auto mb-12"
+          >
+            <motion.span variants={fadeUp} className="eyebrow">
+              Enhance Your Hydration
+            </motion.span>
+            <motion.h2 variants={fadeUp} className="mt-3 text-3xl sm:text-4xl font-serif font-bold text-ink-900">
+              Available IV Add-Ons
+            </motion.h2>
+            <motion.p variants={fadeUp} className="mt-3 text-ink-500 leading-relaxed">
+              Customize any IV infusion package with our specialized nutrient add-ons for targeted wellness results.
+            </motion.p>
+          </motion.div>
+
+          <motion.div
+            variants={staggerFast}
+            initial="hidden"
+            whileInView="visible"
+            viewport={viewport}
+            className="grid gap-6 sm:grid-cols-2 max-w-3xl mx-auto"
+          >
+            {IV_ADD_ONS.map((addon) => (
+              <motion.div key={addon.name} variants={scaleIn} whileHover={{ y: -4 }} className="card p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-9 h-9 rounded-full bg-sky-100 border border-sky-200 flex items-center justify-center">
+                      <Plus className="w-5 h-5 text-sky-600" />
+                    </div>
+                    <span className="text-orange-500 font-black text-xl">{addon.price}</span>
+                  </div>
+                  <h3 className="font-bold text-ink-900 text-lg">{addon.name}</h3>
+                  <p className="text-xs text-ink-600 mt-2 leading-relaxed">{addon.description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── Package Deals Section ── */}
+      <section className="bg-white border-t border-ink-100 py-16 sm:py-20">
+        <div className="container-page">
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={viewport}
+            className="text-center max-w-2xl mx-auto mb-12"
+          >
+            <motion.span variants={fadeUp} className="eyebrow">
+              Special Bundles
+            </motion.span>
+            <motion.h2 variants={fadeUp} className="mt-3 text-3xl sm:text-4xl font-serif font-bold text-ink-900">
+              Official Package Deals
+            </motion.h2>
+            <motion.p variants={fadeUp} className="mt-3 text-ink-500 leading-relaxed">
+              Save on multi-session IV therapy packages for ongoing hydration and wellness maintenance.
+            </motion.p>
+          </motion.div>
+
+          <motion.div
+            variants={staggerFast}
+            initial="hidden"
+            whileInView="visible"
+            viewport={viewport}
+            className="grid gap-6 md:grid-cols-2 max-w-4xl mx-auto"
+          >
+            {IV_PACKAGE_DEALS.map((deal) => (
+              <motion.div
+                key={deal.title}
+                variants={scaleIn}
+                whileHover={{ y: -4 }}
+                className="card p-6 border-2 border-sky-100 bg-gradient-to-br from-sky-50/50 to-white flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-100 text-primary-800 px-3 py-1 text-xs font-bold uppercase tracking-wider">
+                      <Tag className="w-3.5 h-3.5" /> Package Deal
+                    </span>
+                    <span className="text-2xl font-black text-primary-900">{deal.dealPrice}</span>
+                  </div>
+                  <h3 className="font-serif font-bold text-ink-900 text-xl mt-1">{deal.title}</h3>
+                  {deal.pricePerUnit && <p className="text-xs text-ink-500 font-semibold mt-1">{deal.pricePerUnit}</p>}
+                  <p className="text-sm text-ink-600 mt-3 leading-relaxed">{deal.description}</p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-sky-100 flex items-center justify-between">
+                  <span className="text-xs text-ink-400 font-medium">Includes 3 IV Infusions</span>
+                  <Link
+                    to="/book-iv/"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-500 hover:text-orange-600 transition-colors"
+                  >
+                    Book Package Deal <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               </motion.div>
             ))}
@@ -162,3 +274,4 @@ export function IVPackages() {
     </>
   );
 }
+
