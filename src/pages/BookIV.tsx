@@ -416,7 +416,7 @@ export function BookIV() {
           <button onClick={() => navigate('/iv-packages/')} className="inline-flex items-center gap-1.5 text-sky-200 hover:text-white text-sm transition-colors">
             <ArrowLeft className="w-4 h-4" /> IV Packages
           </button>
-          <span className="font-serif font-bold text-base">Book IV Therapy Appointment</span>
+          <h1 className="font-serif font-bold text-base">Book IV Therapy Appointment</h1>
           <span className="text-sky-300 text-sm hidden sm:block">Step {Math.min(step + 1, 4)} of 4</span>
         </div>
       </div>

@@ -23,6 +23,8 @@ export function About() {
       <Seo
         title="About Us | MD Abidi Arthritis Institute"
         description="Dr. Mutahir Abidi provides expert arthritis treatment, rheumatology care, and pain management in Brick and Freehold, NJ. Board-certified rheumatologist with 15+ years of experience."
+        image={drImg}
+        path="/about-us/"
       />
       <PageHero
         eyebrow="About Us"

@@ -9,6 +9,7 @@ import { CTASection } from '@/components/common/CTASection';
 import { site } from '@/data/site';
 import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
 import { useCmsRealtime } from '@/lib/cmsLive';
+import { absoluteUrl } from '@/lib/seo';
 
 export interface Ingredient { abbr: string; name: string; description: string; dosage?: string; }
 export interface AddOn { name: string; price: string; description: string; }
@@ -73,6 +74,39 @@ export function IVPackageDetail({
       <Seo
         title={`${name} IV Therapy Package | MD Abidi Arthritis Institute`}
         description={tagline}
+        image={image}
+        jsonLd={[
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Product',
+            name: `${name} IV Therapy Package`,
+            description: tagline,
+            image,
+            brand: {
+              '@type': 'Brand',
+              name: site.name,
+            },
+            offers: {
+              '@type': 'Offer',
+              priceCurrency: 'USD',
+              price: String(price),
+              availability: 'https://schema.org/InStock',
+              url: absoluteUrl(`/iv-packages/${slug}/`),
+            },
+          },
+          {
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: faqs.map((f) => ({
+              '@type': 'Question',
+              name: f.q,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: f.a,
+              },
+            })),
+          },
+        ]}
       />
 
       {/* ── Breadcrumbs ── */}
