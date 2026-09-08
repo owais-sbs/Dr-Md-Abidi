@@ -63,12 +63,17 @@ export function Seo({
     upsertMeta('property', 'og:description', desc);
     upsertMeta('property', 'og:url', canonical);
     upsertMeta('property', 'og:image', ogImage);
+    upsertMeta('property', 'og:image:secure_url', ogImage);
+    upsertMeta('property', 'og:image:type', 'image/png');
+    upsertMeta('property', 'og:image:width', '1200');
+    upsertMeta('property', 'og:image:height', '630');
     upsertMeta('property', 'og:image:alt', `${site.name}`);
 
     upsertMeta('name', 'twitter:card', 'summary_large_image');
     upsertMeta('name', 'twitter:title', title);
     upsertMeta('name', 'twitter:description', desc);
     upsertMeta('name', 'twitter:image', ogImage);
+    upsertMeta('name', 'twitter:image:alt', `${site.name}`);
 
     if (includeOrganization && !noindex) {
       upsertJsonLd('seo-jsonld-organization', organizationGraph());
