@@ -9,7 +9,7 @@ export const site = {
   email: 'admin@mdabidi.com',
   emailHref: 'mailto:admin@mdabidi.com',
   bookingUrl: '/contact-us/',
-  hours: '08:00 AM – 05:00 PM',
+  hours: '09:00 AM – 04:00 PM',
   locations: [
     {
       label: 'Brick',
