@@ -63,7 +63,7 @@ export function Seo({
     upsertMeta('property', 'og:description', desc);
     upsertMeta('property', 'og:url', canonical);
     upsertMeta('property', 'og:image', ogImage);
-    upsertMeta('property', 'og:image:alt', `${site.name} logo`);
+    upsertMeta('property', 'og:image:alt', `${site.name}`);
 
     upsertMeta('name', 'twitter:card', 'summary_large_image');
     upsertMeta('name', 'twitter:title', title);

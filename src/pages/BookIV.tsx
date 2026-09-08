@@ -106,11 +106,27 @@ export function BookIV() {
       const all = await getCmsIVPackages();
       const cms = all
         .filter(p => p.enabled && !p.id.startsWith('static-pkg-'))
-        .map(p => ({ name: p.name, slug: p.slug, price: p.price, image: p.image || '' }));
+        .map(p => ({
+          name: p.name,
+          slug: p.slug,
+          price: p.price,
+          image: p.image || '',
+          description: p.description || '',
+          includes: [] as string[],
+        }));
       const overrides = all.filter(p => p.enabled && p.id.startsWith('static-pkg-'));
       const merged = IV_PACKAGES.map(p => {
         const ov = overrides.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
-        return ov ? { name: ov.name || p.name, slug: ov.slug || p.slug, price: ov.price || p.price, image: ov.image || p.image } : p;
+        return ov
+          ? {
+              ...p,
+              name: ov.name || p.name,
+              slug: ov.slug || p.slug,
+              price: ov.price || p.price,
+              image: ov.image || p.image,
+              description: ov.description || p.description,
+            }
+          : p;
       });
       setAllPackages([...merged, ...cms]);
     } catch {

@@ -268,8 +268,8 @@ export function IVPackages() {
       <CTASection
         title="Need help choosing the right package?"
         description="Our team can help you select the most appropriate IV therapy option based on your goals and symptoms."
-        buttonText="Contact Us"
-        buttonLink="/contact-us/"
+        primaryLabel="Contact Us"
+        primaryHref="/contact-us/"
       />
     </>
   );

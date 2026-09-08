@@ -5,7 +5,8 @@ export const SITE_URL = String(
   import.meta.env.VITE_PUBLIC_SITE_URL || 'https://dr-md-abidi.vercel.app',
 ).replace(/\/$/, '');
 
-export const DEFAULT_OG_IMAGE = site.logo;
+/** Default Open Graph / Twitter share image (clinic favicon). */
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 export function absoluteUrl(path = '/'): string {
   if (!path || path === '/') return `${SITE_URL}/`;
