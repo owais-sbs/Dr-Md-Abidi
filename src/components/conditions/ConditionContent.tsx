@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2 } from 'lucide-react';
-import { fadeUp, staggerContainer, viewport } from '@/animations/variants';
+import { fadeUp, staggerContainer } from '@/animations/variants';
 import type { Condition } from '@/data/conditions';
 
 export function ConditionContent({ condition }: { condition: Condition }) {
@@ -11,8 +11,7 @@ export function ConditionContent({ condition }: { condition: Condition }) {
           <motion.div
             variants={staggerContainer}
             initial="hidden"
-            whileInView="visible"
-            viewport={viewport}
+            animate="visible"
             className="lg:col-span-2 space-y-6"
           >
             <motion.h2 variants={fadeUp} className="text-2xl sm:text-3xl font-bold text-ink-900">
@@ -24,16 +23,16 @@ export function ConditionContent({ condition }: { condition: Condition }) {
               </motion.p>
             ))}
 
-            {condition.sections.map((s) => (
+            {condition.sections?.length > 0 && condition.sections.map((s) => (
               <motion.div key={s.heading} variants={fadeUp} className="pt-4">
                 <h3 className="text-xl sm:text-2xl font-bold text-ink-900">{s.heading}</h3>
-                {s.body.map((b, i) => (
+                {s.body.filter(Boolean).map((b, i) => (
                   <p key={i} className="mt-3 text-ink-600 leading-relaxed">{b}</p>
                 ))}
               </motion.div>
             ))}
 
-            {condition.symptoms && (
+            {condition.symptoms && condition.symptoms.length > 0 && (
               <motion.div variants={fadeUp} className="pt-4">
                 <h3 className="text-xl sm:text-2xl font-bold text-ink-900">Common Symptoms</h3>
                 <ul className="mt-4 space-y-2.5">
@@ -48,25 +47,32 @@ export function ConditionContent({ condition }: { condition: Condition }) {
             )}
 
             <motion.div variants={fadeUp} className="pt-4">
-              <h3 className="text-xl sm:text-2xl font-bold text-ink-900">Treatment</h3>
-              <p className="mt-3 text-ink-600 leading-relaxed">{condition.treatmentIntro}</p>
+              {condition.treatmentIntro ? (
+                <>
+                  <h3 className="text-xl sm:text-2xl font-bold text-ink-900">Treatment</h3>
+                  <p className="mt-3 text-ink-600 leading-relaxed">{condition.treatmentIntro}</p>
+                </>
+              ) : null}
             </motion.div>
           </motion.div>
 
           <motion.aside
             variants={fadeUp}
             initial="hidden"
-            whileInView="visible"
-            viewport={viewport}
+            animate="visible"
             className="lg:col-span-1"
           >
             <div className="card p-6 sticky top-28">
-              <img
-                src={condition.heroImage}
-                alt={condition.heroImageAlt}
-                loading="lazy"
-                className="w-full aspect-[4/3] rounded-xl object-cover"
-              />
+              {(condition.heroImage || condition.cardImage) ? (
+                <img
+                  src={condition.heroImage || condition.cardImage}
+                  alt={condition.heroImageAlt || condition.title}
+                  loading="lazy"
+                  className="w-full aspect-[4/3] rounded-xl object-cover"
+                />
+              ) : (
+                <div className="w-full aspect-[4/3] rounded-xl bg-ink-100" />
+              )}
               <h3 className="mt-5 text-lg font-bold text-ink-900">{condition.ctaHeading}</h3>
               <p className="mt-2 text-sm text-ink-600 leading-relaxed">{condition.ctaBody}</p>
             </div>

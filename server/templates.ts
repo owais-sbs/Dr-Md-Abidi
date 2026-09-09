@@ -134,13 +134,16 @@ export function approvedEmail(d: {
 }
 
 export function rejectedEmail(d: {
-  name: string; packageName: string; date: string; time: string; location: string; id: string;
+  name: string; packageName: string; date: string; time: string; location: string; id: string; reason?: string;
 }): { subject: string; html: string; text: string } {
   const subject = 'Update on your IV Therapy appointment request';
+  const reasonBlock = d.reason
+    ? `<p style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:14px;font-size:13px;color:#9f1239;"><strong>Note from the clinic:</strong> ${d.reason}</p>`
+    : '';
   const html = layout(subject, `
     <h1 style="margin:0 0 16px;font-size:22px;color:#142657;">Update on your request</h1>
     <p>Hello ${d.name},</p>
-    <p>Thank you for your interest in IV Therapy at ${CLINIC.name}. After review, we are unable to approve the requested appointment at this time.</p>
+    <p>Thank you for your interest in IV Therapy at ${CLINIC.name}. After clinical review, we are unable to approve the requested appointment at this time.</p>
     ${detailsTable([
       ['Package', d.packageName],
       ['Requested date', formatLongDate(d.date)],
@@ -148,10 +151,11 @@ export function rejectedEmail(d: {
       ['Location', `${d.location}, NJ`],
       ['Request ID', d.id],
     ])}
+    ${reasonBlock}
     <p>This decision is based on clinical review of the information provided. You are welcome to contact our office if you would like to discuss other options or request a different time.</p>
     <p>Phone: ${CLINIC.phone}<br/>Email: ${CLINIC.email}</p>
     <p>Regards,<br/><strong>${CLINIC.name}</strong><br/>${CLINIC.tagline}</p>
   `);
-  const text = `Hello ${d.name}, we are unable to approve your IV Therapy request (${d.id}) for ${d.packageName} on ${formatLongDate(d.date)} at ${d.time}. Please contact ${CLINIC.phone} if you have questions. — ${CLINIC.name}`;
+  const text = `Hello ${d.name}, we are unable to approve your IV Therapy request (${d.id}) for ${d.packageName} on ${formatLongDate(d.date)} at ${d.time}.${d.reason ? ` Note: ${d.reason}` : ''} Please contact ${CLINIC.phone} if you have questions. — ${CLINIC.name}`;
   return { subject, html, text };
 }

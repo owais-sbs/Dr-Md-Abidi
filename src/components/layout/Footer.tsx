@@ -3,15 +3,22 @@ import { motion } from 'framer-motion';
 import { Clock, Mail, MapPin, Phone } from 'lucide-react';
 import { footerPages } from '@/data/navigation';
 import { site } from '@/data/site';
+import { conditions } from '@/data/conditions';
 import { useLiveNav } from '@/lib/liveNav';
 import { staggerContainer, staggerFast, fadeUp, slideRight, viewport } from '@/animations/variants';
 
 export function Footer() {
   const nav = useLiveNav();
+  const fromNav = nav.find(i => i.href === '/conditions-we-treat/')?.children || [];
+  const seen = new Set(fromNav.map((t) => t.href));
+  const extras = conditions
+    .map((c) => ({ label: c.title, href: c.href }))
+    .filter((t) => !seen.has(t.href));
   const treatments = [
-    ...(nav.find(i => i.href === '/conditions-we-treat/')?.children || []).slice(0, 4),
-    { label: 'View All Treatments', href: '/conditions-we-treat/' },
-  ];
+    ...fromNav,
+    ...extras,
+  ].slice(0, 11);
+  treatments.push({ label: 'View All Services', href: '/conditions-we-treat/' });
   return (
     <footer className="bg-primary-900 text-sky-100">
       <div className="container-page py-12 sm:py-14">
@@ -111,9 +118,20 @@ export function Footer() {
           <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/disclaimer/" className="hover:text-orange-400 transition-colors">Disclaimer</Link>
             <Link to="/privacy-policy/" className="hover:text-orange-400 transition-colors">Privacy Policy</Link>
+            <Link to="/terms-conditions/" className="hover:text-orange-400 transition-colors">Terms &amp; Conditions</Link>
           </motion.div>
           <motion.p variants={fadeUp} className="text-center">
             © {new Date().getFullYear()} {site.name}. All Rights Reserved.
+            {' · '}
+            Website by{' '}
+            <a
+              href="https://onepathsolutions.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sky-100/80 hover:text-orange-400 transition-colors underline-offset-2 hover:underline"
+            >
+              One Path Solutions
+            </a>
           </motion.p>
         </motion.div>
       </div>

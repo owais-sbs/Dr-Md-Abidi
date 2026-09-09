@@ -27,7 +27,7 @@ const features = [
 
 export function JointHealthSection() {
   return (
-    <section className="bg-white overflow-hidden">
+    <section className="bg-white">
       <div className="container-page py-12 sm:py-20">
         <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={viewport} className="max-w-2xl mx-auto text-center">
           <motion.span variants={fadeDown} className="eyebrow">Why Arthritis &amp; Joint Health Matters</motion.span>
@@ -36,7 +36,7 @@ export function JointHealthSection() {
         </motion.div>
         <motion.div variants={staggerFast} initial="hidden" whileInView="visible" viewport={viewport} className="mt-10 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((f, i) => (
-            <motion.div key={f.title} variants={scaleInBounce} custom={i} whileHover={{ y: -6 }} className="card p-5 sm:p-6 cursor-default transition-shadow">
+            <motion.div key={f.title} variants={scaleInBounce} custom={i} whileHover={{ boxShadow: '0 16px 32px -12px rgba(20,38,87,0.14)' }} className="card p-5 sm:p-6 cursor-default transition-shadow">
               <div className="grid place-items-center w-11 h-11 rounded-xl bg-primary-50 text-primary-600 mb-4">
                 <f.icon className="w-5 h-5" />
               </div>

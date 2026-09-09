@@ -10,15 +10,35 @@ import {
   getAvailableDates, getTimeSlotAvailability, type TimeSlotAvailability,
 } from '@/data/appointments';
 import { IV_PACKAGES } from '@/data/ivPackages';
-import { getCmsIVPackages } from '@/data/cms';
+import { conditions as staticConditions } from '@/data/conditions';
+import { getCmsIVPackages, getCmsConditions } from '@/data/cms';
 import { supabase, supabaseReady } from '@/lib/supabase';
 import { createBookingRequest, sendBookingOtp, verifyBookingOtp } from '@/lib/bookingApi';
+import { LegalConsentCheckbox } from '@/components/common/LegalConsentCheckbox';
+
+type BookableService = {
+  key: string;
+  kind: 'iv' | 'condition';
+  slug: string;
+  name: string;
+  price?: number;
+  category: string;
+};
+
+function resolvePreselected(params: URLSearchParams): string {
+  const pkg = params.get('package');
+  if (pkg) return `iv:${pkg}`;
+  const service = params.get('service');
+  if (!service) return '';
+  if (service.startsWith('iv:') || service.startsWith('condition:')) return service;
+  return `condition:${service}`;
+}
 
 /* ─────────────────────────────────────────────
    STEP SIDEBAR
 ───────────────────────────────────────────── */
 const STEPS = [
-  { num: 1, label: 'Select Package',  sub: 'Choose your IV infusion type' },
+  { num: 1, label: 'Choose Service',  sub: 'Select a treatment or IV package' },
   { num: 2, label: 'Choose Slot',     sub: 'Pick date, location & time' },
   { num: 3, label: 'Verify Email',    sub: 'OTP confirmation' },
   { num: 4, label: 'Medical Form',    sub: 'Patient intake & history' },
@@ -30,7 +50,7 @@ function Sidebar({ current }: { current: number }) {
       <div className="bg-primary-900 rounded-2xl p-6 text-white sticky top-8">
         <div className="flex items-center gap-2 mb-6">
           <Syringe className="w-5 h-5 text-orange-400" />
-          <span className="font-bold text-sm">IV Therapy Booking</span>
+          <span className="font-bold text-sm">Appointment Booking</span>
         </div>
         <div className="space-y-1">
           {STEPS.map((s, i) => {
@@ -92,45 +112,88 @@ function MobileSteps({ current }: { current: number }) {
 export function BookIV() {
   const [params] = useSearchParams();
   const navigate  = useNavigate();
-  const preselected = params.get('package') || '';
+  const preselected = resolvePreselected(params);
 
-  const [allPackages, setAllPackages] = useState(IV_PACKAGES);
+  const [services, setServices] = useState<BookableService[]>([]);
   const [dates, setDates] = useState<{ date: string; location: 'Freehold' | 'Brick' }[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlotAvailability[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [slotNotice, setSlotNotice] = useState('');
   const [submitError, setSubmitError] = useState('');
 
-  async function loadPackages() {
+  async function loadServices() {
     try {
-      const all = await getCmsIVPackages();
-      const cms = all
-        .filter(p => p.enabled && !p.id.startsWith('static-pkg-'))
-        .map(p => ({
-          name: p.name,
+      const [pkgs, conds] = await Promise.all([getCmsIVPackages(), getCmsConditions()]);
+
+      const deletedPkgSlugs = new Set(
+        pkgs.filter((p) => !p.enabled || p.tagline === '__DELETED__').map((p) => p.slug),
+      );
+      const pkgOverrides = pkgs.filter(p => p.enabled && p.id.startsWith('static-pkg-') && p.tagline !== '__DELETED__');
+      const cmsPkgs = pkgs.filter(p => p.enabled && !p.id.startsWith('static-pkg-') && p.tagline !== '__DELETED__');
+      const ivServices: BookableService[] = [
+        ...IV_PACKAGES.filter(p => !deletedPkgSlugs.has(p.slug)).map(p => {
+          const ov = pkgOverrides.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
+          return {
+            key: `iv:${ov?.slug || p.slug}`,
+            kind: 'iv' as const,
+            slug: ov?.slug || p.slug,
+            name: ov?.name || p.name,
+            price: ov?.price ?? p.price,
+            category: 'IV Therapy Package',
+          };
+        }),
+        ...cmsPkgs.map(p => ({
+          key: `iv:${p.slug}`,
+          kind: 'iv' as const,
           slug: p.slug,
+          name: p.name,
           price: p.price,
-          image: p.image || '',
-          description: p.description || '',
-          includes: [] as string[],
-        }));
-      const overrides = all.filter(p => p.enabled && p.id.startsWith('static-pkg-'));
-      const merged = IV_PACKAGES.map(p => {
-        const ov = overrides.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
-        return ov
-          ? {
-              ...p,
-              name: ov.name || p.name,
-              slug: ov.slug || p.slug,
-              price: ov.price || p.price,
-              image: ov.image || p.image,
-              description: ov.description || p.description,
-            }
-          : p;
-      });
-      setAllPackages([...merged, ...cms]);
+          category: 'IV Therapy Package',
+        })),
+      ];
+
+      const condOverrides = conds.filter(c => c.id.startsWith('static-cond-'));
+      const cmsConds = conds.filter(c => c.enabled && !c.id.startsWith('static-cond-'));
+      const conditionServices: BookableService[] = [
+        ...staticConditions.flatMap(c => {
+          const ov = condOverrides.find(o => o.slug === c.slug || o.id === `static-cond-${c.slug}`);
+          if (ov && !ov.enabled) return [];
+          return [{
+            key: `condition:${ov?.slug || c.slug}`,
+            kind: 'condition' as const,
+            slug: ov?.slug || c.slug,
+            name: ov?.title || c.title,
+            category: 'Conditions We Treat',
+          }];
+        }),
+        ...cmsConds.map(c => ({
+          key: `condition:${c.slug}`,
+          kind: 'condition' as const,
+          slug: c.slug,
+          name: c.title,
+          category: 'Conditions We Treat',
+        })),
+      ];
+
+      setServices([...conditionServices, ...ivServices]);
     } catch {
-      setAllPackages(IV_PACKAGES);
+      setServices([
+        ...staticConditions.map(c => ({
+          key: `condition:${c.slug}`,
+          kind: 'condition' as const,
+          slug: c.slug,
+          name: c.title,
+          category: 'Conditions We Treat',
+        })),
+        ...IV_PACKAGES.map(p => ({
+          key: `iv:${p.slug}`,
+          kind: 'iv' as const,
+          slug: p.slug,
+          name: p.name,
+          price: p.price,
+          category: 'IV Therapy Package',
+        })),
+      ]);
     }
   }
 
@@ -138,22 +201,23 @@ export function BookIV() {
     try {
       setDates(await getAvailableDates());
     } catch (err) {
-      console.error('[BookIV] loadDates failed:', err);
+      console.error('[Book] loadDates failed:', err);
       setDates([]);
     }
   }
 
   useEffect(() => {
-    loadPackages();
+    loadServices();
     loadDates();
     if (!supabaseReady) return;
     const channel = supabase
       .channel('booking-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_configs' }, () => { loadDates(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => { loadDates(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_iv_packages' }, () => { loadPackages(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_iv_packages' }, () => { loadServices(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cms_conditions' }, () => { loadServices(); })
       .subscribe();
-    const onFocus = () => { loadDates(); loadPackages(); };
+    const onFocus = () => { loadDates(); loadServices(); };
     window.addEventListener('focus', onFocus);
     return () => {
       supabase.removeChannel(channel);
@@ -163,7 +227,7 @@ export function BookIV() {
 
   const [step, setStep] = useState(0);
 
-  // Step 0 — package
+  // Step 0 — service
   const [selectedPkg, setSelectedPkg] = useState(preselected);
 
   // Step 1 — slot
@@ -212,9 +276,10 @@ export function BookIV() {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [legalAgreed, setLegalAgreed] = useState(false);
   const [savedId, setSavedId]       = useState('');
 
-  const pkgObj  = allPackages.find(p => p.slug === selectedPkg);
+  const pkgObj  = services.find(p => p.key === selectedPkg);
   const slotObj = dates.find(d => d.date === selectedDate);
 
   useEffect(() => {
@@ -356,6 +421,11 @@ export function BookIV() {
     let tokenFromStore = '';
     try { tokenFromStore = sessionStorage.getItem('iv-verify-token') || ''; } catch { tokenFromStore = ''; }
     const token = verificationToken || tokenFromStore;
+    if (!legalAgreed) {
+      setSubmitError('Please agree to the Privacy Policy and Terms & Conditions.');
+      setSubmitting(false);
+      return;
+    }
     if (!token) {
       setSubmitError('Please verify your email before submitting.');
       setStep(2);
@@ -368,7 +438,7 @@ export function BookIV() {
         verificationToken: token,
         email,
         packageName: pkgObj?.name || '',
-        packageSlug: selectedPkg,
+        packageSlug: pkgObj?.slug || selectedPkg,
         location: slotObj?.location || 'Freehold',
         date: selectedDate,
         time: selectedTime,
@@ -424,15 +494,15 @@ export function BookIV() {
 
   return (
     <>
-      <Seo title="Book IV Therapy | MD Abidi Arthritis Institute" description="Book your IV therapy session — select package, choose a slot, verify email, complete intake form." />
+      <Seo title="Book Appointment | MD Abidi Arthritis Institute" description="Book a consultation or IV therapy session — choose a service, pick a slot, verify email, complete intake form." />
 
       {/* Top bar */}
       <div className="bg-primary-900 text-white py-4 border-b border-white/10">
         <div className="container-page flex items-center justify-between">
-          <button onClick={() => navigate('/iv-packages/')} className="inline-flex items-center gap-1.5 text-sky-200 hover:text-white text-sm transition-colors">
-            <ArrowLeft className="w-4 h-4" /> IV Packages
+          <button onClick={() => navigate('/')} className="inline-flex items-center gap-1.5 text-sky-200 hover:text-white text-sm transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Home
           </button>
-          <h1 className="font-serif font-bold text-base">Book IV Therapy Appointment</h1>
+          <h1 className="font-serif font-bold text-base !text-white">Book Appointment</h1>
           <span className="text-sky-300 text-sm hidden sm:block">Step {Math.min(step + 1, 4)} of 4</span>
         </div>
       </div>
@@ -453,23 +523,47 @@ export function BookIV() {
                   {step === 0 && (
                     <motion.div key="s0" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
                       <div className="bg-white rounded-2xl shadow-soft border border-ink-100 p-8">
-                        <h2 className="text-xl font-serif font-bold text-ink-900 mb-1">Select Your IV Package</h2>
-                        <p className="text-sm text-ink-500 mb-6">Choose the IV infusion type you'd like to book</p>
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          {allPackages.map(pkg => (
-                            <button key={pkg.slug} type="button" onClick={() => setSelectedPkg(pkg.slug)}
+                        <h2 className="text-xl font-serif font-bold text-ink-900 mb-1">Choose Service</h2>
+                        <p className="text-sm text-ink-500 mb-6">Select the professional treatment or IV package you wish to book</p>
+
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-ink-400 mb-3">Conditions We Treat</p>
+                        <div className="grid sm:grid-cols-2 gap-3 mb-8">
+                          {services.filter(s => s.kind === 'condition').map(svc => (
+                            <button key={svc.key} type="button" onClick={() => setSelectedPkg(svc.key)}
                               className={`flex items-center justify-between px-5 py-4 rounded-xl border-2 transition-all text-left ${
-                                selectedPkg === pkg.slug ? 'border-primary-900 bg-primary-50' : 'border-ink-100 hover:border-primary-200 bg-white'
+                                selectedPkg === svc.key ? 'border-primary-900 bg-primary-50' : 'border-ink-100 hover:border-primary-200 bg-white'
                               }`}
                             >
                               <div>
-                                <div className={`font-semibold text-sm ${selectedPkg === pkg.slug ? 'text-primary-900' : 'text-ink-800'}`}>{pkg.name}</div>
-                                <div className="text-xs text-ink-400 mt-0.5">IV Therapy Package</div>
+                                <div className={`font-semibold text-sm ${selectedPkg === svc.key ? 'text-primary-900' : 'text-ink-800'}`}>{svc.name}</div>
+                                <div className="text-xs text-ink-400 mt-0.5">{svc.category}</div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className={`font-black text-lg ${selectedPkg === pkg.slug ? 'text-primary-900' : 'text-ink-600'}`}>${pkg.price}</span>
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPkg === pkg.slug ? 'border-primary-900 bg-primary-900' : 'border-ink-300'}`}>
-                                  {selectedPkg === pkg.slug && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                <span className={`text-xs font-bold ${selectedPkg === svc.key ? 'text-primary-900' : 'text-ink-500'}`}>Consult</span>
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPkg === svc.key ? 'border-primary-900 bg-primary-900' : 'border-ink-300'}`}>
+                                  {selectedPkg === svc.key && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-ink-400 mb-3">IV Therapy Packages</p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {services.filter(s => s.kind === 'iv').map(svc => (
+                            <button key={svc.key} type="button" onClick={() => setSelectedPkg(svc.key)}
+                              className={`flex items-center justify-between px-5 py-4 rounded-xl border-2 transition-all text-left ${
+                                selectedPkg === svc.key ? 'border-primary-900 bg-primary-50' : 'border-ink-100 hover:border-primary-200 bg-white'
+                              }`}
+                            >
+                              <div>
+                                <div className={`font-semibold text-sm ${selectedPkg === svc.key ? 'text-primary-900' : 'text-ink-800'}`}>{svc.name}</div>
+                                <div className="text-xs text-ink-400 mt-0.5">{svc.category}</div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`font-black text-lg ${selectedPkg === svc.key ? 'text-primary-900' : 'text-ink-600'}`}>${svc.price}</span>
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPkg === svc.key ? 'border-primary-900 bg-primary-900' : 'border-ink-300'}`}>
+                                  {selectedPkg === svc.key && <CheckCircle2 className="w-3 h-3 text-white" />}
                                 </div>
                               </div>
                             </button>
@@ -489,10 +583,10 @@ export function BookIV() {
                       <div className="bg-white rounded-2xl shadow-soft border border-ink-100 p-8">
                         <div className="flex items-center justify-between bg-primary-50 border border-primary-100 rounded-xl px-4 py-3 mb-6">
                           <div>
-                            <div className="text-xs text-primary-600 font-semibold uppercase tracking-wider">Package</div>
+                            <div className="text-xs text-primary-600 font-semibold uppercase tracking-wider">Service</div>
                             <div className="font-bold text-primary-900 text-sm mt-0.5">{pkgObj?.name}</div>
                           </div>
-                          <span className="font-black text-primary-900 text-xl">${pkgObj?.price}</span>
+                          <span className="font-black text-primary-900 text-xl">{pkgObj?.kind === 'iv' ? `$${pkgObj.price}` : 'Consult'}</span>
                         </div>
                         <h2 className="text-xl font-serif font-bold text-ink-900 mb-1">Choose Date & Time</h2>
                         <p className="text-sm text-ink-500 mb-5">Freehold: Mon / Wed / Fri &nbsp;·&nbsp; Brick: Tue / Thu</p>
@@ -615,7 +709,7 @@ export function BookIV() {
                         <div className="bg-primary-900 text-white rounded-2xl px-6 py-4 mb-5 grid sm:grid-cols-4 gap-3 text-sm">
                           <div className="flex items-start gap-2">
                             <CheckCircle2 className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
-                            <div><div className="text-xs text-sky-300">Package</div><div className="font-bold">{pkgObj?.name} — ${pkgObj?.price}</div></div>
+                            <div><div className="text-xs text-sky-300">Service</div><div className="font-bold">{pkgObj?.name}{pkgObj?.kind === 'iv' ? ` — $${pkgObj.price}` : ' — Consultation'}</div></div>
                           </div>
                           <div className="flex items-start gap-2">
                             <CalendarDays className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
@@ -654,7 +748,7 @@ export function BookIV() {
                               </div>
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Phone Number <span className="text-red-400">*</span></label>
-                                <input required type="tel" value={form.phone} onChange={e => setF('phone', e.target.value)} placeholder="(555) 000-0000" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
+                                <input required type="tel" inputMode="numeric" pattern="[0-9]*" autoComplete="tel" value={form.phone} onChange={e => setF('phone', e.target.value.replace(/\D/g, '').slice(0, 15))} placeholder="7328408402" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
                               </div>
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Date of Birth <span className="text-red-400">*</span></label>
@@ -783,6 +877,8 @@ export function BookIV() {
                               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{submitError}</div>
                             )}
 
+                            <LegalConsentCheckbox id="book-iv-consent" checked={legalAgreed} onChange={setLegalAgreed} />
+
                             {/* ── Submit ── */}
                             <div className="flex gap-3 pt-2">
                               <button type="button" onClick={() => setStep(2)} className="flex-1 inline-flex items-center justify-center gap-2 border-2 border-ink-200 text-ink-700 font-semibold px-5 py-3.5 rounded-full text-sm hover:border-primary-900 transition-all">
@@ -813,7 +909,7 @@ export function BookIV() {
                 </p>
                 <div className="bg-ink-50 border border-ink-100 rounded-xl p-5 mb-6 text-left space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-ink-500">Booking ID</span><span className="font-bold text-primary-900">{savedId}</span></div>
-                  <div className="flex justify-between"><span className="text-ink-500">Package</span><span className="font-semibold">{pkgObj?.name}</span></div>
+                  <div className="flex justify-between"><span className="text-ink-500">Service</span><span className="font-semibold">{pkgObj?.name}</span></div>
                   <div className="flex justify-between"><span className="text-ink-500">Date</span><span className="font-semibold">{formatDate(selectedDate)}</span></div>
                   <div className="flex justify-between"><span className="text-ink-500">Time</span><span className="font-semibold">{selectedTime}</span></div>
                   <div className="flex justify-between"><span className="text-ink-500">Location</span><span className="font-semibold">{slotObj?.location}, NJ</span></div>
@@ -821,8 +917,8 @@ export function BookIV() {
                 </div>
                 <p className="text-xs text-ink-400 mb-8">An acknowledgement has been sent to <strong>{email}</strong>. You'll receive confirmation once the doctor approves.</p>
                 <div className="flex flex-wrap justify-center gap-3">
-                  <button onClick={() => navigate('/iv-packages/')} className="inline-flex items-center gap-2 border-2 border-ink-200 hover:border-primary-900 text-ink-700 font-semibold px-6 py-3 rounded-full text-sm transition-all">
-                    Back to IV Packages
+                  <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 border-2 border-ink-200 hover:border-primary-900 text-ink-700 font-semibold px-6 py-3 rounded-full text-sm transition-all">
+                    Back to Home
                   </button>
                   <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 bg-primary-900 hover:bg-primary-800 text-white font-semibold px-6 py-3 rounded-full text-sm transition-all">
                     Go to Home

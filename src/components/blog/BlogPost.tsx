@@ -28,6 +28,22 @@ export function BlogPost({ post }: { post: BlogPostType }) {
 
         <div className="container-page py-14 sm:py-20">
           <div className="max-w-3xl mx-auto">
+            {post.featuredImage && (
+              <motion.div
+                variants={fadeUp}
+                initial="hidden"
+                whileInView="visible"
+                viewport={viewport}
+                className="mb-8"
+              >
+                <img
+                  src={post.featuredImage}
+                  alt={post.title}
+                  className="w-full max-w-sm sm:max-w-md rounded-2xl object-cover shadow-soft border border-ink-100 aspect-[16/10]"
+                  loading="eager"
+                />
+              </motion.div>
+            )}
             <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={viewport} className="space-y-6">
               {post.content.map((block, i) => {
                 if (block.type === 'heading') {

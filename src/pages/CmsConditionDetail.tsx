@@ -1,142 +1,85 @@
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { useParams, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { CalendarDays, Phone, CheckCircle2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
+import { ConditionHero } from '@/components/conditions/ConditionHero';
+import { ConditionContent } from '@/components/conditions/ConditionContent';
+import { RelatedConditions } from '@/components/conditions/RelatedConditions';
 import { CTASection } from '@/components/common/CTASection';
-import { Breadcrumbs } from '@/components/common/Breadcrumbs';
-import { getCmsConditions, type CmsCondition } from '@/data/cms';
-import { fadeUp, staggerContainer, viewport } from '@/animations/variants';
-import { site } from '@/data/site';
+import { conditions as staticConditions, type Condition } from '@/data/conditions';
+import { getCmsConditions, cmsConditionToCondition, type CmsCondition } from '@/data/cms';
 
 export function CmsConditionDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const [condition, setCondition] = useState<CmsCondition | null | undefined>(undefined);
+  const [cmsRow, setCmsRow] = useState<CmsCondition | null | undefined>(undefined);
+  const [related, setRelated] = useState<Condition[]>(staticConditions);
 
   useEffect(() => {
     let alive = true;
     getCmsConditions()
-      .then(list => {
+      .then((list) => {
         if (!alive) return;
-        setCondition(list.find(c => c.slug === slug && c.enabled && !c.id.startsWith('static-cond-')) || null);
+        const match = list.find((c) => c.slug === slug && c.enabled && !c.id.startsWith('static-cond-')) || null;
+        setCmsRow(match);
+
+        const disabledStatic = new Set(
+          list
+            .filter((c) => c.id.startsWith('static-cond-') && !c.enabled)
+            .map((c) => c.slug),
+        );
+        const visibleStatic = staticConditions.filter((c) => !disabledStatic.has(c.slug));
+        const cmsExtras = list
+          .filter((c) => c.enabled && !c.id.startsWith('static-cond-') && c.slug !== slug)
+          .map(cmsConditionToCondition);
+        setRelated([...visibleStatic, ...cmsExtras]);
       })
-      .catch(() => { if (alive) setCondition(null); });
+      .catch(() => {
+        if (alive) {
+          setCmsRow(null);
+          setRelated(staticConditions);
+        }
+      });
     return () => { alive = false; };
   }, [slug]);
 
-  if (condition === undefined) {
+  if (cmsRow === undefined) {
     return (
       <div className="min-h-[40vh] grid place-items-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary-900" />
       </div>
     );
   }
-  if (!condition) return <Navigate to="/conditions-we-treat/" replace />;
+  if (!cmsRow) return <Navigate to="/conditions-we-treat/" replace />;
 
-  const symptoms = condition.symptoms ? condition.symptoms.split(',').map(s => s.trim()).filter(Boolean) : [];
-  const paragraphs = condition.overview ? condition.overview.split('\n').filter(Boolean) : [];
+  const condition = cmsConditionToCondition(cmsRow);
+  if (!condition.overview.length && condition.shortDescription) {
+    condition.overview = [condition.shortDescription];
+  }
 
   return (
     <>
       <Seo
-        title={condition.metaTitle || `${condition.title} | MD Abidi Arthritis Institute`}
-        description={condition.metaDescription || condition.shortDescription}
+        title={condition.metaTitle}
+        description={condition.metaDescription}
+        image={condition.heroImage || undefined}
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'MedicalWebPage',
-          name: condition.metaTitle || condition.title,
-          description: condition.metaDescription || condition.shortDescription,
+          name: condition.metaTitle,
+          description: condition.metaDescription,
           about: {
             '@type': 'MedicalCondition',
             name: condition.title,
             description: condition.shortDescription || condition.metaDescription,
           },
           specialty: 'Rheumatology',
+          audience: { '@type': 'Patient' },
         }}
       />
-
-      <Breadcrumbs items={[{ label: 'Conditions We Treat', href: '/conditions-we-treat/' }, { label: condition.title }]} />
-
-      <section className="relative overflow-hidden bg-primary-900 text-white">
-        {condition.heroImage && (
-          <div className="absolute inset-0 opacity-25"
-            style={{ backgroundImage: `url(${condition.heroImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary-900/95 via-primary-900/80 to-primary-800/60" />
-        <div className="container-page relative py-14 sm:py-20">
-          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="max-w-2xl">
-            {condition.heroEyebrow && (
-              <motion.span variants={fadeUp} className="eyebrow text-sky-300">{condition.heroEyebrow}</motion.span>
-            )}
-            <motion.h1 variants={fadeUp} className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-white text-balance leading-tight">
-              {condition.title}
-            </motion.h1>
-            <motion.p variants={fadeUp} className="mt-4 text-base sm:text-lg text-sky-100/80 leading-relaxed">
-              {condition.shortDescription}
-            </motion.p>
-            <motion.div variants={fadeUp} className="mt-7 flex flex-wrap gap-3">
-              <Link to={site.bookingUrl}
-                className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-7 py-3.5 rounded-full shadow-lift transition-all text-sm">
-                <CalendarDays className="w-4 h-4" /> Book Appointment Online
-              </Link>
-              <a href={site.phoneHref}
-                className="inline-flex items-center gap-2 border-2 border-white/30 hover:border-white text-white font-semibold px-7 py-3.5 rounded-full transition-all text-sm hover:bg-white/10">
-                <Phone className="w-4 h-4" /> {site.phone}
-              </a>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {paragraphs.length > 0 && (
-        <section className="bg-white">
-          <div className="container-page py-14">
-            <div className="max-w-3xl">
-              <motion.span variants={fadeUp} initial="hidden" whileInView="visible" viewport={viewport} className="eyebrow">Overview</motion.span>
-              <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={viewport} className="mt-4 space-y-4 text-ink-600 leading-relaxed">
-                {paragraphs.map((p, i) => (
-                  <motion.p key={i} variants={fadeUp}>{p}</motion.p>
-                ))}
-              </motion.div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {symptoms.length > 0 && (
-        <section className="bg-ink-50">
-          <div className="container-page py-14">
-            <motion.span variants={fadeUp} initial="hidden" whileInView="visible" viewport={viewport} className="eyebrow">Common Symptoms</motion.span>
-            <motion.ul variants={staggerContainer} initial="hidden" whileInView="visible" viewport={viewport}
-              className="mt-6 grid sm:grid-cols-2 gap-3 max-w-2xl">
-              {symptoms.map(s => (
-                <motion.li key={s} variants={fadeUp} className="flex items-start gap-2.5 text-sm text-ink-700">
-                  <CheckCircle2 className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" /> {s}
-                </motion.li>
-              ))}
-            </motion.ul>
-          </div>
-        </section>
-      )}
-
-      {condition.treatmentIntro && (
-        <section className="bg-white">
-          <div className="container-page py-14">
-            <div className="max-w-3xl">
-              <motion.span variants={fadeUp} initial="hidden" whileInView="visible" viewport={viewport} className="eyebrow">Treatment</motion.span>
-              <motion.p variants={fadeUp} initial="hidden" whileInView="visible" viewport={viewport} className="mt-4 text-ink-600 leading-relaxed">
-                {condition.treatmentIntro}
-              </motion.p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      <CTASection
-        eyebrow="Get Expert Care"
-        title={condition.title + ' Treatment in Brick & Freehold, NJ'}
-        description="Our rheumatology team can help. Schedule a consultation today."
-      />
+      <ConditionHero condition={condition} />
+      <ConditionContent condition={condition} />
+      <RelatedConditions conditions={related} currentSlug={condition.slug} />
+      <CTASection eyebrow="Schedule a Visit" title={condition.ctaHeading} description={condition.ctaBody} />
     </>
   );
 }

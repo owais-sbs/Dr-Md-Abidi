@@ -17,7 +17,7 @@ export function IVPackages() {
 
   async function loadCms() {
     try {
-      const all = (await getCmsIVPackages()).filter(p => p.enabled);
+      const all = await getCmsIVPackages();
       setOverridePkgs(all.filter(p => p.id.startsWith('static-pkg-')));
     } catch {
       setOverridePkgs([]);
@@ -29,8 +29,14 @@ export function IVPackages() {
   }, []);
   useCmsRealtime(loadCms);
 
-  const displayPackages = IV_PACKAGES.map(p => {
-    const ov = overridePkgs.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
+  const hiddenSlugs = new Set(
+    overridePkgs.filter(p => !p.enabled || p.tagline === '__DELETED__').map(p => p.slug),
+  );
+
+  const displayPackages = IV_PACKAGES
+    .filter(p => !hiddenSlugs.has(p.slug))
+    .map(p => {
+    const ov = overridePkgs.find(o => o.enabled && (o.slug === p.slug || o.id === `static-pkg-${p.slug}`));
     if (!ov) return p;
     return {
       ...p,
@@ -89,25 +95,22 @@ export function IVPackages() {
           <motion.div
             variants={staggerFast}
             initial="hidden"
-            whileInView="visible"
-            viewport={viewport}
+            animate="visible"
             className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
           >
             {displayPackages.map((pkg) => (
               <motion.div
                 key={pkg.slug}
                 variants={scaleIn}
-                whileHover={{ y: -8, boxShadow: '0 24px 60px -18px rgba(20,38,87,0.18)' }}
-                transition={{ duration: 0.25 }}
-                className="group"
+                className="group h-full"
               >
-                <div className="card overflow-hidden h-full flex flex-col">
+                <div className="card h-full flex flex-col hover:shadow-card transition-shadow">
                   <div className="relative aspect-[16/10] overflow-hidden bg-sky-50">
                     <img
                       src={pkg.image}
                       alt={pkg.name}
                       loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-ink-950/60 via-transparent to-transparent" />
                     {pkg.badge && (
@@ -145,7 +148,7 @@ export function IVPackages() {
                       )}
                     </ul>
                     <Link
-                      to={`/book-iv/?package=${pkg.slug}`}
+                      to={`/book/?package=${pkg.slug}`}
                       className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 group-hover:gap-2.5 transition-all"
                     >
                       Book This Package <ArrowRight className="w-4 h-4" />
@@ -253,7 +256,7 @@ export function IVPackages() {
                 <div className="mt-6 pt-4 border-t border-sky-100 flex items-center justify-between">
                   <span className="text-xs text-ink-400 font-medium">Includes 3 IV Infusions</span>
                   <Link
-                    to="/book-iv/"
+                    to="/book/"
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-500 hover:text-orange-600 transition-colors"
                   >
                     Book Package Deal <ArrowRight className="w-3.5 h-3.5" />

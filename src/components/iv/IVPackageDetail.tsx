@@ -175,7 +175,7 @@ export function IVPackageDetail({
               {/* CTAs */}
               <motion.div variants={fadeUp} className="mt-7 flex flex-wrap gap-3">
                 <Link
-                  to={`/book-iv/?package=${slug}`}
+                  to={`/book/?package=${slug}`}
                   className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm px-7 py-3.5 rounded-full shadow-lift transition-all duration-200"
                 >
                   <CalendarDays className="w-4 h-4" /> Book This Package
@@ -209,19 +209,18 @@ export function IVPackageDetail({
                 <div className="rounded-3xl overflow-hidden shadow-card border border-ink-100">
                   {/* Blue water-splash bg area */}
                   <div
-                    className="relative flex items-center justify-center h-72 overflow-hidden"
+                    className="relative h-72 overflow-hidden"
                     style={{
                       background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 40%, #f0f9ff 100%)',
                     }}
                   >
-                    {/* IV bag image */}
                     <motion.img
                       src={image}
                       alt={`${name} IV therapy bag`}
-                      className="relative h-52 w-auto object-contain drop-shadow-xl z-10"
+                      className="absolute inset-0 w-full h-full object-cover object-center z-10"
                       loading="eager"
-                      animate={{ y: [0, -6, 0] }}
-                      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                      animate={{ scale: [1, 1.03, 1] }}
+                      transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
                     />
                   </div>
 
@@ -313,7 +312,13 @@ export function IVPackageDetail({
             <motion.h2 variants={fadeUp} className="mt-2 text-2xl font-serif font-bold text-ink-900">Need an Extra Boost?</motion.h2>
             <motion.p variants={fadeUp} className="mt-2 text-sm text-ink-500">Add any of the following to your IV package for targeted results</motion.p>
           </motion.div>
-          <motion.div variants={staggerFast} initial="hidden" whileInView="visible" viewport={viewport} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <motion.div
+            variants={staggerFast}
+            initial="hidden"
+            whileInView="visible"
+            viewport={viewport}
+            className="grid gap-4 sm:grid-cols-2 max-w-3xl mx-auto justify-items-stretch"
+          >
             {addOns.map(a => (
               <motion.div key={a.name} variants={scaleIn} whileHover={{ y: -4 }} className="card p-5">
                 <div className="flex items-center justify-between mb-3">
@@ -411,10 +416,10 @@ export function IVPackageDetail({
             </motion.div>
             <motion.div variants={staggerFast} initial="hidden" whileInView="visible" viewport={viewport} className="grid gap-6 sm:grid-cols-3">
               {related.map(r => (
-                <motion.div key={r.href} variants={scaleIn} whileHover={{ y: -5 }} className="card overflow-hidden group cursor-pointer">
-                  <div className="flex items-center justify-center h-44 overflow-hidden"
-                    style={{ background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 60%, #f0f9ff 100%)' }}>
-                    <img src={r.image} alt={r.name} className="h-36 object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-md" loading="lazy" />
+                <motion.div key={r.href} variants={scaleIn} className="h-full">
+                  <div className="card h-full overflow-hidden group hover:shadow-card transition-shadow">
+                  <div className="relative h-44 overflow-hidden bg-sky-50">
+                    <img src={r.image} alt={r.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                   </div>
                   <div className="p-5">
                     <div className="flex justify-between items-start mb-2">
@@ -428,6 +433,7 @@ export function IVPackageDetail({
                     <Link to={r.href} className="inline-flex items-center gap-1.5 text-primary-900 hover:text-orange-500 font-semibold text-xs transition-colors">
                       View Details <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
+                  </div>
                   </div>
                 </motion.div>
               ))}

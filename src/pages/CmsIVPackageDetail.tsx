@@ -102,7 +102,7 @@ export function CmsIVPackageDetail() {
                 </motion.div>
               )}
               <motion.div variants={fadeUp} className="mt-7 flex flex-wrap gap-3">
-                <Link to={`/book-iv/?package=${pkg.slug}`}
+                <Link to={`/book/?package=${pkg.slug}`}
                   className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm px-7 py-3.5 rounded-full shadow-lift transition-all">
                   <CalendarDays className="w-4 h-4" /> Book This Package
                 </Link>
@@ -117,11 +117,11 @@ export function CmsIVPackageDetail() {
             <motion.div variants={scaleIn} initial="hidden" animate="visible" transition={{ delay: 0.2 }} className="order-1 lg:order-2 flex justify-center">
               <div className="relative w-full max-w-[400px]">
                 <div className="rounded-3xl overflow-hidden shadow-card border border-ink-100">
-                  <div className="flex items-center justify-center h-64 overflow-hidden"
+                  <div className="relative h-64 overflow-hidden"
                     style={{ background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 40%, #f0f9ff 100%)' }}>
                     {pkg.image
-                      ? <img src={pkg.image} alt={pkg.name} className="h-52 w-auto object-contain drop-shadow-xl" loading="eager" />
-                      : <div className="w-20 h-20 rounded-full bg-sky-100 flex items-center justify-center text-sky-400 text-4xl">💉</div>
+                      ? <img src={pkg.image} alt={pkg.name} className="absolute inset-0 w-full h-full object-cover object-center" loading="eager" />
+                      : <div className="w-full h-full flex items-center justify-center text-sky-400 text-4xl">💉</div>
                     }
                   </div>
                   {dosageSummary && (
@@ -200,7 +200,7 @@ export function CmsIVPackageDetail() {
               <motion.span variants={fadeUp} className="eyebrow">Enhance Your Treatment</motion.span>
               <motion.h2 variants={fadeUp} className="mt-2 text-2xl font-serif font-bold text-ink-900">Need an Extra Boost?</motion.h2>
             </motion.div>
-            <motion.div variants={staggerFast} initial="hidden" whileInView="visible" viewport={viewport} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <motion.div variants={staggerFast} initial="hidden" whileInView="visible" viewport={viewport} className="grid gap-4 sm:grid-cols-2 max-w-3xl mx-auto">
               {addOns.map((a, i) => (
                 <motion.div key={i} variants={scaleIn} whileHover={{ y: -4 }} className="card p-5">
                   <div className="flex items-center justify-between mb-3">

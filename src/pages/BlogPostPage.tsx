@@ -1,10 +1,14 @@
+import { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { Seo } from '@/components/common/Seo';
-import { BlogPost } from '@/components/blog/BlogPost';
+import { BlogPost as BlogPostView } from '@/components/blog/BlogPost';
 import { CTASection } from '@/components/common/CTASection';
-import { getPost } from '@/data/blogPosts';
+import { getPost, type BlogPost } from '@/data/blogPosts';
+import { getCmsBlogPosts } from '@/data/cms';
+import { cmsBlogToPost } from '@/lib/blogCms';
 import { SITE_URL, absoluteUrl } from '@/lib/seo';
 import { site } from '@/data/site';
+import { Loader2 } from 'lucide-react';
 
 function metaDescriptionForPost(excerpt: string, firstParagraph?: string): string {
   const cleaned = excerpt.trim();
@@ -19,7 +23,32 @@ function metaDescriptionForPost(excerpt: string, firstParagraph?: string): strin
 
 export function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
-  const post = slug ? getPost(slug) : undefined;
+  const staticPost = slug ? getPost(slug) : undefined;
+  const [post, setPost] = useState<BlogPost | undefined>(staticPost);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    if (!slug) { setLoading(false); return; }
+    getCmsBlogPosts()
+      .then((cms) => {
+        if (!alive) return;
+        const match = cms.find((p) => p.slug === slug && p.enabled);
+        if (match) setPost(cmsBlogToPost(match));
+        else setPost(getPost(slug));
+      })
+      .catch(() => { if (alive) setPost(getPost(slug)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="py-24 grid place-items-center text-ink-400">
+        <Loader2 className="w-6 h-6 animate-spin" />
+      </div>
+    );
+  }
 
   if (!post) return <Navigate to="/blog/" replace />;
 
@@ -61,7 +90,7 @@ export function BlogPostPage() {
           isPartOf: { '@id': `${SITE_URL}/#website` },
         }}
       />
-      <BlogPost post={post} />
+      <BlogPostView post={post} />
       <CTASection
         eyebrow="Get Expert Care"
         title="Have Questions About Your Symptoms?"

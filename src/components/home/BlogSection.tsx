@@ -8,7 +8,7 @@ import { blogPosts } from '@/data/blogPosts';
 
 export function BlogSection() {
   return (
-    <section className="bg-ink-50 overflow-hidden">
+    <section className="bg-ink-50">
       <div className="container-page py-20">
 
         <motion.div
@@ -38,7 +38,7 @@ export function BlogSection() {
               key={p.slug}
               variants={scaleIn}
               custom={i}
-              whileHover={{ y: -6, boxShadow: '0 20px 48px -12px rgba(20,38,87,0.18)' }}
+              whileHover={{ boxShadow: '0 16px 36px -12px rgba(20,38,87,0.16)' }}
               transition={{ duration: 0.25 }}
             >
               <BlogCard post={p} />

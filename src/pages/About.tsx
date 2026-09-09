@@ -69,10 +69,21 @@ export function About() {
             title="Meet Our Arthritis Specialists & Rheumatology Experts"
             description="Our experienced rheumatologists provide expert arthritis treatment, pain management, and autoimmune disease care for patients throughout Brick and Freehold, NJ. We are committed to delivering personalized treatment plans that help patients reduce pain, improve mobility, and achieve long-term joint health."
           />
-          <div className="mt-12 grid gap-8 md:grid-cols-2">
-            <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={viewport} className="card overflow-hidden">
-              <img src={drImg} alt="Dr. Mutahir Abidi" loading="lazy" className="w-full aspect-[4/3] object-cover object-top" />
-              <div className="p-6">
+          <div className="mt-12 max-w-5xl mx-auto">
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="visible"
+              viewport={viewport}
+              className="card overflow-hidden grid md:grid-cols-[280px_1fr] lg:grid-cols-[320px_1fr]"
+            >
+              <img
+                src={drImg}
+                alt="Dr. Mutahir Abidi"
+                loading="lazy"
+                className="w-full h-full min-h-[260px] aspect-[4/5] md:aspect-auto object-cover object-top"
+              />
+              <div className="p-6 sm:p-8">
                 <h3 className="text-xl font-bold text-ink-900">Dr. Mutahir Abidi</h3>
                 <p className="text-sm font-medium text-primary-600 mt-1">Board-Certified Rheumatologist &amp; Arthritis Specialist</p>
                 <div className="mt-4 space-y-3 text-sm text-ink-600 leading-relaxed">

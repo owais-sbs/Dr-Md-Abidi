@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Outlet, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { Header } from '@/components/layout/Header';
@@ -14,6 +14,7 @@ import { BlogPostPage } from '@/pages/BlogPostPage';
 import { Contact } from '@/pages/Contact';
 import { Disclaimer } from '@/pages/Disclaimer';
 import { PrivacyPolicy } from '@/pages/PrivacyPolicy';
+import { TermsConditions } from '@/pages/TermsConditions';
 import { IVPackages } from '@/pages/IVPackages';
 import { BookIV } from '@/pages/BookIV';
 import { AdminDashboard } from '@/pages/AdminDashboard';
@@ -21,6 +22,11 @@ import { IVPackageRoute } from '@/pages/IVPackageRoute';
 import { PublicSlugPage } from '@/pages/PublicSlugPage';
 import { NotFound } from '@/pages/NotFound';
 
+function RedirectBookIv() {
+  const [params] = useSearchParams();
+  const q = params.toString();
+  return <Navigate to={q ? `/book/?${q}` : '/book/'} replace />;
+}
 function RedirectIvCms() {
   const { slug } = useParams<{ slug: string }>();
   return <Navigate to={`/iv-packages/${slug}/`} replace />;
@@ -85,7 +91,8 @@ function App() {
           <Route path="/iv-packages/" element={<IVPackages />} />
           <Route path="/iv-packages/cms/:slug/" element={<RedirectIvCms />} />
           <Route path="/iv-packages/:slug/" element={<IVPackageRoute />} />
-          <Route path="/book-iv/" element={<BookIV />} />
+          <Route path="/book/" element={<BookIV />} />
+          <Route path="/book-iv/" element={<RedirectBookIv />} />
           <Route path="/cms-condition/:slug/" element={<RedirectConditionCms />} />
           <Route path="/happy-patients/" element={<HappyPatients />} />
           <Route path="/blog/" element={<Blog />} />
@@ -93,6 +100,7 @@ function App() {
           <Route path="/contact-us/" element={<Contact />} />
           <Route path="/disclaimer/" element={<Disclaimer />} />
           <Route path="/privacy-policy/" element={<PrivacyPolicy />} />
+          <Route path="/terms-conditions/" element={<TermsConditions />} />
           <Route path="/:slug/" element={<PublicSlugPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>

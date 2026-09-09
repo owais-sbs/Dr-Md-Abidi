@@ -25,7 +25,7 @@ export function ConditionHero({ condition }: { condition: Condition }) {
               {condition.shortDescription}
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <Link to={site.bookingUrl} className="btn bg-white text-primary-700 px-6 py-3 hover:bg-primary-50 hover:shadow-lift">
+              <Link to={`/book/?service=${condition.slug}`} className="btn bg-white text-primary-700 px-6 py-3 hover:bg-primary-50 hover:shadow-lift">
                 <CalendarDays className="w-5 h-5" />
                 Book Appointment Online
               </Link>

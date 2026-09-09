@@ -8,7 +8,7 @@ import { CmsConditionDetail } from '@/pages/CmsConditionDetail';
 
 const RESERVED = new Set([
   'about-us', 'conditions-we-treat', 'iv-packages', 'happy-patients',
-  'blog', 'contact-us', 'disclaimer', 'privacy-policy', 'book-iv', 'admin',
+  'blog', 'contact-us', 'disclaimer', 'privacy-policy', 'book-iv', 'book', 'admin',
 ]);
 
 export function PublicSlugPage() {

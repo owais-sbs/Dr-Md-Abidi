@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
 import { Seo } from '@/components/common/Seo';
 import { PageHero } from '@/components/common/PageHero';
 import { SectionHeading } from '@/components/common/SectionHeading';
 import { CTASection } from '@/components/common/CTASection';
 import { ConditionCard } from '@/components/conditions/ConditionCard';
 import { conditions } from '@/data/conditions';
-import { staggerContainer, staggerFast, scaleIn, fadeUp, viewport } from '@/animations/variants';
-import { getCmsConditions, type CmsCondition } from '@/data/cms';
+import { staggerContainer, staggerFast, viewport } from '@/animations/variants';
+import { getCmsConditions, cmsConditionToCondition, type CmsCondition } from '@/data/cms';
 import { useCmsRealtime } from '@/lib/cmsLive';
 
 const heroImg = 'https://images.pexels.com/photos/3992806/pexels-photo-3992806.jpeg?auto=compress&cs=tinysrgb&h=900&w=1600';
@@ -42,7 +40,8 @@ export function Conditions() {
       ...c,
       title: ov.title || c.title,
       shortDescription: ov.shortDescription || c.shortDescription,
-      cardImage: ov.cardImage || c.cardImage,
+      cardImage: ov.cardImage || ov.heroImage || c.cardImage,
+      heroImage: ov.heroImage || ov.cardImage || c.heroImage,
       heroEyebrow: ov.heroEyebrow || c.heroEyebrow,
       href: `/${ov.slug || c.slug}/`,
     }];
@@ -100,35 +99,7 @@ export function Conditions() {
               className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
             >
               {cmsConditions.map(c => (
-                <motion.div key={c.id} variants={scaleIn} whileHover={{ y: -5 }} className="card overflow-hidden flex flex-col group">
-                  {c.cardImage && (
-                    <div className="relative aspect-[16/10] overflow-hidden">
-                      <img src={c.cardImage} alt={c.title} loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-ink-950/40 via-transparent to-transparent" />
-                      {c.heroEyebrow && (
-                        <span className="absolute top-3 left-3 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-700 shadow-sm">
-                          {c.heroEyebrow}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="p-5 flex flex-col flex-1">
-                    <h3 className="text-base font-bold text-ink-900 group-hover:text-primary-700 transition-colors">{c.title}</h3>
-                    <p className="mt-2 text-sm text-ink-600 leading-relaxed line-clamp-3 flex-1">{c.shortDescription}</p>
-                    <motion.div variants={fadeUp} className="mt-4">
-                      {c.href ? (
-                        <Link to={`/${c.slug}/`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:gap-2.5 transition-all">
-                          Learn More <ArrowRight className="w-4 h-4" />
-                        </Link>
-                      ) : (
-                        <Link to="/contact-us/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:gap-2.5 transition-all">
-                          Contact Us <ArrowRight className="w-4 h-4" />
-                        </Link>
-                      )}
-                    </motion.div>
-                  </div>
-                </motion.div>
+                <ConditionCard key={c.id} condition={cmsConditionToCondition(c)} />
               ))}
             </motion.div>
           </div>

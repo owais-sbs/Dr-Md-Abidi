@@ -50,6 +50,7 @@ export const mainNav: NavItem[] = [
 export const footerPages = [
   { label: 'Home',           href: '/' },
   { label: 'About Us',       href: '/about-us/' },
+  { label: 'Conditions We Treat', href: '/conditions-we-treat/' },
   { label: 'IV Packages',    href: '/iv-packages/' },
   { label: 'Happy Patients', href: '/happy-patients/' },
   { label: 'Blog',           href: '/blog/' },
@@ -61,7 +62,7 @@ export const footerTreatments = [
   { label: 'Psoriatic Arthritis',   href: '/psoriatic-arthritis/' },
   { label: 'Lupus',                 href: '/lupus/' },
   { label: "Sjogren's Syndrome",    href: '/sjogrens-syndrome/' },
-  { label: 'View All Treatments',   href: '/conditions-we-treat/' },
+  { label: 'View All Services',     href: '/conditions-we-treat/' },
 ];
 
 export const bookingHref = site.bookingUrl;

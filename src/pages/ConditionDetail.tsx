@@ -23,6 +23,7 @@ export function ConditionDetail({ slug: slugProp }: { slug?: string }) {
   };
 
   useEffect(() => {
+    setOv(undefined);
     loadOverride();
   }, [slug]);
 
@@ -30,24 +31,26 @@ export function ConditionDetail({ slug: slugProp }: { slug?: string }) {
 
   if (!base) return <Navigate to="/conditions-we-treat/" replace />;
 
+  const overviewFromCms = ov?.overview?.trim()
+    ? ov.overview.split('\n').map(s => s.trim()).filter(Boolean)
+    : null;
+  const symptomsFromCms = ov?.symptoms?.trim()
+    ? ov.symptoms.split(',').map(s => s.trim()).filter(Boolean)
+    : null;
+
   // Merge CMS override fields into the static condition
   const condition: Condition = ov ? {
     ...base,
     title:           ov.title           || base.title,
     shortDescription:ov.shortDescription|| base.shortDescription,
     heroEyebrow:     ov.heroEyebrow     || base.heroEyebrow,
-    heroImage:       ov.heroImage       || base.heroImage,
-    cardImage:       ov.cardImage       || base.cardImage,
+    heroImage:       ov.heroImage       || ov.cardImage || base.heroImage,
+    cardImage:       ov.cardImage       || ov.heroImage || base.cardImage,
     treatmentIntro:  ov.treatmentIntro  || base.treatmentIntro,
     metaTitle:       ov.metaTitle       || base.metaTitle,
     metaDescription: ov.metaDescription || base.metaDescription,
-    // Merge overview paragraphs if provided
-    overview: ov.overview
-      ? ov.overview.split('\n').filter(Boolean)
-      : base.overview,
-    symptoms: ov.symptoms
-      ? ov.symptoms.split(',').map(s => s.trim()).filter(Boolean)
-      : base.symptoms,
+    overview: overviewFromCms && overviewFromCms.length ? overviewFromCms : base.overview,
+    symptoms: symptomsFromCms && symptomsFromCms.length ? symptomsFromCms : base.symptoms,
   } : base;
 
   return (

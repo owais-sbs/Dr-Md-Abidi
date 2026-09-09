@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Phone, X } from 'lucide-react';
 import { site } from '@/data/site';
@@ -23,6 +23,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const nav = useLiveNav();
 
   useEffect(() => {
@@ -145,7 +146,7 @@ export function Header() {
               <Phone className="w-4 h-4 text-primary-900" />
               {site.phone}
             </a>
-            <Link to={site.bookingUrl} className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 py-2.5 rounded-full transition-all duration-200 text-sm shadow-soft">
+            <Link to={site.bookingUrl} className="inline-flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-full transition-all duration-200 text-sm shadow-soft hover:opacity-95" style={{ backgroundColor: '#e07a14' }}>
               Book Now
             </Link>
           </div>
@@ -211,7 +212,15 @@ export function Header() {
                         <button
                           type="button"
                           className="w-full flex items-center justify-between px-3 py-3 rounded-lg text-ink-800 font-medium hover:bg-primary-50"
-                          onClick={() => setExpanded((v) => (v === item.label ? null : item.label))}
+                          onClick={() => {
+                            if (expanded === item.label) {
+                              setOpen(false);
+                              setExpanded(null);
+                              navigate(item.href);
+                              return;
+                            }
+                            setExpanded(item.label);
+                          }}
                           aria-expanded={expanded === item.label}
                         >
                           {item.label}
@@ -263,7 +272,7 @@ export function Header() {
                   <Phone className="w-4 h-4" />
                   {site.phone}
                 </a>
-                <Link to={site.bookingUrl} className="flex items-center justify-center gap-2 w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 py-3 rounded-full text-sm transition-all">
+                <Link to={site.bookingUrl} className="flex items-center justify-center gap-2 w-full text-white font-semibold px-5 py-3 rounded-full text-sm transition-all" style={{ backgroundColor: '#e07a14' }}>
                   Book Now
                 </Link>
               </div>

@@ -47,7 +47,7 @@ export function mergeLiveNav(
       const children = (item.children || []).flatMap(ch => {
         const original = slugFromHref(ch.href);
         const ov = findPackageOverride(pkgs, original);
-        if (ov && !ov.enabled) return [];
+        if (ov && (!ov.enabled || ov.tagline === '__DELETED__')) return [];
         const slug = ov?.slug || original;
         return [{ label: (ov?.name || ch.label).trim() || ch.label, href: `/iv-packages/${slug}/` }];
       });

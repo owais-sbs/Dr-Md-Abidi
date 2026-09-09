@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
 import { handleCreateAppointment, handleReviewAppointment } from './appointments';
+import { handleAdminUsers } from './adminUsers';
 import { clientIp, fail, type ApiResult } from './http';
 import { handleOtpSend, handleOtpVerify } from './otp';
 
@@ -36,6 +37,7 @@ export async function dispatchApi(
   if (path === '/api/otp/verify') return handleOtpVerify(body);
   if (path === '/api/appointments') return handleCreateAppointment(body);
   if (path === '/api/appointments/review') return handleReviewAppointment(body, headers);
+  if (path === '/api/admin/users') return handleAdminUsers(method, body, headers);
   return fail('Not found.', 404);
 }
 

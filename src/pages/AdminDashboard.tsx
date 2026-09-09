@@ -22,7 +22,7 @@ import {
 } from '@/data/appointments';
 import {
   getCmsConditions, saveCmsCondition, deleteCmsCondition,
-  getCmsIVPackages, saveCmsIVPackage, deleteCmsIVPackage,
+  getCmsIVPackages, saveCmsIVPackage, deleteCmsIVPackageHard,
   newId, makeSlug,
   type CmsCondition, type CmsIVPackage,
 } from '@/data/cms';
@@ -33,10 +33,12 @@ import { supabase } from '@/lib/supabase';
 import { AdminLogin } from '@/pages/AdminLogin';
 import { clinicForDate } from '@/lib/cmsLive';
 import { reviewBooking } from '@/lib/bookingApi';
+import { AdminBlogPanel, AdminSettingsPanel } from '@/components/admin/AdminExtraPanels';
+import { adminConfirm, adminError, adminSuccess, adminToast } from '@/lib/adminSwal';
 
 /* ─── Types ─────────────────────────────── */
-type NavPage = 'overview' | 'appointments' | 'calendar' | 'slots' | 'messages' | 'conditions' | 'iv-packages';
-const NAV_PAGES: NavPage[] = ['overview', 'appointments', 'calendar', 'slots', 'messages', 'conditions', 'iv-packages'];
+type NavPage = 'overview' | 'appointments' | 'calendar' | 'slots' | 'messages' | 'conditions' | 'iv-packages' | 'blog' | 'settings';
+const NAV_PAGES: NavPage[] = ['overview', 'appointments', 'calendar', 'slots', 'messages', 'conditions', 'iv-packages', 'blog', 'settings'];
 function isNavPage(v: string | undefined): v is NavPage {
   return !!v && (NAV_PAGES as string[]).includes(v);
 }
@@ -81,8 +83,10 @@ const NAV_SECTIONS = [
   { title: 'Content', items: [
     { id: 'conditions'  as NavPage, label: 'Conditions We Treat', icon: Activity },
     { id: 'iv-packages' as NavPage, label: 'IV Packages',         icon: Syringe },
+    { id: 'blog'        as NavPage, label: 'Blog',                icon: FileText },
   ]},
   { title: 'Enquiries', items: [{ id: 'messages' as NavPage, label: 'Contact Messages', icon: MessageSquare }] },
+  { title: 'System', items: [{ id: 'settings' as NavPage, label: 'Settings', icon: Lock }] },
 ];
 
 function Sidebar({ page, setPage, counts, onLogout }: {
@@ -112,7 +116,7 @@ function Sidebar({ page, setPage, counts, onLogout }: {
       <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto hide-scrollbar">
         {NAV_SECTIONS.map(sec => (
           <div key={sec.title}>
-            <p className="text-[10px] font-bold uppercase tracking-widest px-3 mb-2" style={{ color: 'rgba(255,255,255,0.2)' }}>{sec.title}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest px-3 mb-2" style={{ color: 'rgba(255,255,255,0.55)' }}>{sec.title}</p>
             <div className="space-y-0.5">
               {sec.items.map(item => {
                 const active = page === item.id;
@@ -126,15 +130,15 @@ function Sidebar({ page, setPage, counts, onLogout }: {
                     }}>
                     <span className="flex items-center gap-2.5">
                       <item.icon className="w-4 h-4 shrink-0 transition-colors"
-                        style={{ color: active ? '#60a5fa' : 'rgba(255,255,255,0.35)' }} />
+                        style={{ color: active ? '#93c5fd' : '#ffffff' }} />
                       <span className="text-xs font-medium transition-colors"
-                        style={{ color: active ? '#f1f5f9' : 'rgba(255,255,255,0.55)' }}>
+                        style={{ color: active ? '#ffffff' : '#f8fafc' }}>
                         {item.label}
                       </span>
                     </span>
                     {b > 0 && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center"
-                        style={{ background: active ? '#3b82f6' : 'rgba(255,255,255,0.1)', color: active ? '#fff' : 'rgba(255,255,255,0.4)' }}>
+                        style={{ background: active ? '#3b82f6' : 'rgba(255,255,255,0.2)', color: '#fff' }}>
                         {b}
                       </span>
                     )}
@@ -226,9 +230,9 @@ function ApptRow({ appt, expanded, onToggle, onAction }: {
         </div>
         <div className="text-[10px] text-ink-400 shrink-0">{fmtTs(appt.createdAt)}</div>
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-          {appt.status==='pending'   && <><button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button><button onClick={()=>onAction(appt.id,{status:'hold'})} className="h-7 px-3 text-[11px] font-bold bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center gap-1"><PauseCircle className="w-3 h-3"/>Hold</button><button onClick={()=>onAction(appt.id,{status:'rejected'})} className="h-7 px-3 text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Decline</button></>}
+          {appt.status==='pending'   && <><button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button><button onClick={()=>onAction(appt.id,{status:'hold'})} className="h-7 px-3 text-[11px] font-bold bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center gap-1"><PauseCircle className="w-3 h-3"/>Hold</button><button onClick={()=>{ const reason = window.prompt('Optional note for the patient (sent in the decline email):') ?? ''; onAction(appt.id,{status:'rejected', rejectionReason: reason}); }} className="h-7 px-3 text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Decline</button></>}
           {appt.status==='approved'  && <><button onClick={()=>onAction(appt.id,{status:'completed'})} className="h-7 px-3 text-[11px] font-bold bg-teal-500 hover:bg-teal-600 text-white rounded-full flex items-center gap-1"><CheckCheck className="w-3 h-3"/>Complete</button><button onClick={()=>onAction(appt.id,{status:'cancelled'})} className="h-7 px-3 text-[11px] font-bold bg-red-400 hover:bg-red-500 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Cancel</button></>}
-          {appt.status==='hold'      && <><button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button><button onClick={()=>onAction(appt.id,{status:'rejected'})} className="h-7 px-3 text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Decline</button></>}
+          {appt.status==='hold'      && <><button onClick={()=>onAction(appt.id,{status:'approved'})}  className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/>Approve</button><button onClick={()=>{ const reason = window.prompt('Optional note for the patient (sent in the decline email):') ?? ''; onAction(appt.id,{status:'rejected', rejectionReason: reason}); }} className="h-7 px-3 text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center gap-1"><XCircle className="w-3 h-3"/>Decline</button></>}
           {(appt.status==='completed'||appt.status==='cancelled'||appt.status==='rejected') && <button onClick={()=>onAction(appt.id,{status:'pending'})} className="h-7 px-3 text-[11px] font-bold bg-orange-400 hover:bg-orange-500 text-white rounded-full flex items-center gap-1"><Clock className="w-3 h-3"/>Reopen</button>}
           <button onClick={onToggle} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-primary-900 text-ink-500 hover:text-primary-900 rounded-full transition-all">
             {expanded?<ChevronUp className="w-3.5 h-3.5"/>:<ChevronDown className="w-3.5 h-3.5"/>}
@@ -650,11 +654,17 @@ function EmptyState({ icon: Icon, text }: { icon: React.ElementType; text: strin
 }
 
 /* ─── CMS FORMS (condition/IV package) ─── */
-const EMPTY_COND: Omit<CmsCondition,'id'|'createdAt'|'updatedAt'> = { slug:'',title:'',href:'',heroEyebrow:'',shortDescription:'',cardImage:'',heroImage:'',overview:'',symptoms:'',treatmentIntro:'',metaTitle:'',metaDescription:'',enabled:true };
+const EMPTY_COND: Omit<CmsCondition,'id'|'createdAt'|'updatedAt'> = {
+  slug: '', title: '', href: '', heroEyebrow: '', shortDescription: '',
+  cardImage: '', heroImage: '', heroImageAlt: '',
+  overview: '', sections: '', symptoms: '', treatmentIntro: '',
+  ctaHeading: '', ctaBody: '',
+  metaTitle: '', metaDescription: '', enabled: true,
+};
 const EMPTY_PKG:  Omit<CmsIVPackage,'id'|'createdAt'|'updatedAt'> = { slug:'',name:'',price:0,badge:'',image:'',tagline:'',description:'',dosages:'',bestFor:'',ingredients:'',addOns:'',enabled:true };
 
 function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; onSave:(c:CmsCondition)=>void|Promise<void>; onCancel:()=>void }) {
-  const [f,setF]=useState(initial?{...initial}:{...EMPTY_COND});
+  const [f,setF]=useState(initial?{...EMPTY_COND,...initial}:{...EMPTY_COND});
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
   const inp="w-full border border-ink-200 focus:border-primary-900 rounded-xl px-4 py-2.5 text-sm outline-none transition-colors";
@@ -667,7 +677,16 @@ function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; 
     const now=new Date().toISOString();
     const slug = (f.slug || makeSlug(f.title)).trim();
     try {
-      await onSave({...f,slug,href:`/${slug}/`,id:initial?.id||newId(),createdAt:initial?.createdAt||now,updatedAt:now});
+      await onSave({
+        ...f,
+        slug,
+        href: `/${slug}/`,
+        cardImage: f.cardImage || f.heroImage || '',
+        heroImage: f.heroImage || f.cardImage || '',
+        id: initial?.id || newId(),
+        createdAt: initial?.createdAt || now,
+        updatedAt: now,
+      });
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : 'Could not save.');
     } finally {
@@ -690,15 +709,38 @@ function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; 
         </div>
       </div>
       <div className="p-6 grid sm:grid-cols-2 gap-4">
-        <div><label className={lbl}>Title *</label><input name="title" required value={f.title} onChange={handle} className={inp}/></div>
+        <div><label className={lbl}>Title *</label><input name="title" required value={f.title} onChange={handle} className={inp} placeholder="e.g. Rheumatoid Arthritis"/></div>
         <div><label className={lbl}>URL slug</label><input name="slug" value={f.slug} onChange={handle} className={inp} placeholder="auto-generated from title"/><p className="text-[10px] text-ink-400 mt-1">/{f.slug || 'slug'}/</p></div>
-        <div><label className={lbl}>Eyebrow</label><input name="heroEyebrow" value={f.heroEyebrow} onChange={handle} className={inp}/></div>
-        <div><label className={lbl}>Short Description</label><input name="shortDescription" value={f.shortDescription} onChange={handle} className={inp}/></div>
-        <div><label className={lbl}>Card Image</label><input name="cardImage" value={f.cardImage} onChange={handle} className={inp} placeholder="/image.jpeg"/></div>
-        <div><label className={lbl}>Hero Image</label><input name="heroImage" value={f.heroImage} onChange={handle} className={inp} placeholder="/image.jpeg"/></div>
-        <div className="sm:col-span-2"><label className={lbl}>Overview</label><textarea name="overview" rows={3} value={f.overview} onChange={handle} className={inp+" resize-none"}/></div>
-        <div className="sm:col-span-2"><label className={lbl}>Symptoms (comma separated)</label><input name="symptoms" value={f.symptoms} onChange={handle} className={inp}/></div>
-        <div className="sm:col-span-2"><label className={lbl}>Treatment Introduction</label><textarea name="treatmentIntro" rows={2} value={f.treatmentIntro} onChange={handle} className={inp+" resize-none"}/></div>
+        <div><label className={lbl}>Eyebrow / category</label><input name="heroEyebrow" value={f.heroEyebrow} onChange={handle} className={inp} placeholder="e.g. Autoimmune Joint Disease"/></div>
+        <div><label className={lbl}>Short description (hero)</label><input name="shortDescription" value={f.shortDescription} onChange={handle} className={inp} placeholder="One-line summary under the title"/></div>
+        <div className="sm:col-span-2">
+          <ImageUploader
+            label="Service image"
+            hint="Recommended 1200×800 px. Used for listing cards, hero background, and the sidebar photo."
+            value={f.cardImage || f.heroImage}
+            onChange={(url) => setF((p) => ({ ...p, cardImage: url, heroImage: url }))}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={lbl}>Overview</label>
+          <textarea name="overview" rows={5} value={f.overview} onChange={handle} className={inp + ' resize-none'} placeholder={"Paragraph 1…\n\nParagraph 2…\n(Separate paragraphs with a blank line)"}/>
+          <p className="text-[10px] text-ink-400 mt-1">Same layout as Rheumatoid Arthritis — blank line between paragraphs.</p>
+        </div>
+        <div className="sm:col-span-2">
+          <label className={lbl}>Extra sections (optional)</label>
+          <textarea name="sections" rows={6} value={f.sections} onChange={handle} className={inp + ' resize-none font-mono text-xs'} placeholder={"## Causes & Risk Factors\nFirst paragraph.\n\nSecond paragraph.\n\n## Diagnosis\nHow this condition is diagnosed…"}/>
+          <p className="text-[10px] text-ink-400 mt-1">Start each section with <code>## Heading</code>. Blank line between paragraphs.</p>
+        </div>
+        <div className="sm:col-span-2">
+          <label className={lbl}>Common symptoms</label>
+          <textarea name="symptoms" rows={4} value={f.symptoms} onChange={handle} className={inp + ' resize-none'} placeholder={"One symptom per line\nor comma-separated"}/>
+        </div>
+        <div className="sm:col-span-2">
+          <label className={lbl}>Treatment</label>
+          <textarea name="treatmentIntro" rows={3} value={f.treatmentIntro} onChange={handle} className={inp + ' resize-none'} placeholder="Treatment overview paragraph shown under Treatment heading"/>
+        </div>
+        <div className="sm:col-span-2"><label className={lbl}>Sidebar / CTA heading</label><input name="ctaHeading" value={f.ctaHeading} onChange={handle} className={inp} placeholder="Specialist … Care in Brick & Freehold, NJ"/></div>
+        <div className="sm:col-span-2"><label className={lbl}>Sidebar / CTA body</label><textarea name="ctaBody" rows={2} value={f.ctaBody} onChange={handle} className={inp + ' resize-none'} placeholder="Short supporting text for the sidebar card and bottom banner"/></div>
         <div><label className={lbl}>Meta Title</label><input name="metaTitle" value={f.metaTitle} onChange={handle} className={inp}/></div>
         <div><label className={lbl}>Meta Description</label><input name="metaDescription" value={f.metaDescription} onChange={handle} className={inp}/></div>
         <div className="flex items-center gap-3"><label className={lbl+" mb-0"}>Published</label><button type="button" onClick={()=>setF(p=>({...p,enabled:!p.enabled}))} className={f.enabled?'text-green-500':'text-ink-300'}>{f.enabled?<ToggleRight className="w-8 h-8"/>:<ToggleLeft className="w-8 h-8"/>}</button><span className={`text-xs font-semibold ${f.enabled?'text-green-600':'text-ink-400'}`}>{f.enabled?'Published':'Draft'}</span></div>
@@ -708,8 +750,18 @@ function ConditionForm({ initial, onSave, onCancel }: { initial?: CmsCondition; 
   );
 }
 
-/* ── Image Upload Widget (used inside IVPackageForm) ── */
-function ImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+/* ── Image Upload Widget ── */
+function ImageUploader({
+  value,
+  onChange,
+  label = 'Image',
+  hint = 'Recommended size: 1200×800 px (JPG/PNG/WebP, max 5 MB). Images use object-cover on the site.',
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  label?: string;
+  hint?: string;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState('');
@@ -751,8 +803,9 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
   }
 
   return (
-    <div className="sm:col-span-2">
-      <label className="block text-xs font-semibold text-ink-700 mb-1.5">Package Image</label>
+    <div>
+      <label className="block text-xs font-semibold text-ink-700 mb-1.5">{label}</label>
+      <p className="text-[10px] text-ink-400 mb-2">{hint}</p>
 
       {/* Preview */}
       {value && (
@@ -895,6 +948,9 @@ function IVPackageForm({ initial, onSave, onCancel }: { initial?: CmsIVPackage; 
 export function AdminDashboard() {
   const [sessionReady, setSessionReady] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [messages,     setMessages]     = useState<ContactMessage[]>([]);
   const [conditions,   setConditions]   = useState<CmsCondition[]>([]);
@@ -912,10 +968,12 @@ export function AdminDashboard() {
   const [delConfirm,  setDelConfirm]  = useState<string|null>(null);
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setLoadError('');
+      setRefreshing(true);
       const [appts, msgs, conds, pkgs, slots] = await Promise.all([
         getAppointments(),
         getContactMessages(),
@@ -930,6 +988,8 @@ export function AdminDashboard() {
       setSlotConfigs(slots);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Could not load admin data.');
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
@@ -938,16 +998,26 @@ export function AdminDashboard() {
     supabase.auth.getSession().then(({ data }) => {
       if (!alive) return;
       setAuthed(!!data.session);
+      setAdminEmail(data.session?.user?.email || '');
       setSessionReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthed(!!session);
+      setAdminEmail(session?.user?.email || '');
       setSessionReady(true);
     });
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!profileRef.current?.contains(e.target as Node)) setProfileOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
   useEffect(() => {
@@ -976,18 +1046,36 @@ export function AdminDashboard() {
         const token = data.session?.access_token;
         if (!token) throw new Error('Please sign in again to review appointments.');
         const result = await reviewBooking(id, patch.status === 'approved' ? 'approve' : 'reject', token, patch.rejectionReason || '');
-        if (result.warning) setActionError(result.warning);
+        if (result.warning) {
+          setActionError(result.warning);
+          await adminToast(result.warning, 'info');
+        } else {
+          await adminToast(patch.status === 'approved' ? 'Appointment approved' : 'Appointment declined', 'success');
+        }
       } else {
         await updateAppointment(id, patch);
+        await adminToast('Appointment updated', 'success');
       }
       await load();
     }
-    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not update appointment.'); }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not update appointment.';
+      setActionError(msg);
+      await adminError('Update failed', msg);
+    }
   }
   async function handleMsg(id: string, s: ContactStatus) {
     setActionError('');
-    try { await updateContactStatus(id, s); await load(); }
-    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not update message.'); }
+    try {
+      await updateContactStatus(id, s);
+      await load();
+      await adminToast('Message updated', 'success');
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not update message.';
+      setActionError(msg);
+      await adminError('Update failed', msg);
+    }
   }
   async function saveCond(c: CmsCondition) {
     setActionError('');
@@ -995,8 +1083,11 @@ export function AdminDashboard() {
       await saveCmsCondition(c);
       setEditingCond(null);
       await load();
+      await adminSuccess('Condition saved', 'Changes are live on the website.');
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not save condition.');
+      const msg = err instanceof Error ? err.message : 'Could not save condition.';
+      setActionError(msg);
+      await adminError('Save failed', msg);
       throw err;
     }
   }
@@ -1006,39 +1097,222 @@ export function AdminDashboard() {
       await saveCmsIVPackage(p);
       setEditingPkg(null);
       await load();
+      await adminSuccess('IV package saved', 'Changes are live on the website.');
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not save package.');
+      const msg = err instanceof Error ? err.message : 'Could not save package.';
+      setActionError(msg);
+      await adminError('Save failed', msg);
       throw err;
     }
   }
   async function delCond(id: string) {
-    try { await deleteCmsCondition(id); setDelConfirm(null); await load(); }
-    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not delete condition.'); }
+    const ok = await adminConfirm({
+      title: 'Delete this condition?',
+      text: 'This cannot be undone. The live page will stop showing this entry.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteCmsCondition(id);
+      setDelConfirm(null);
+      await load();
+      await adminToast('Condition deleted', 'success');
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not delete condition.';
+      setActionError(msg);
+      await adminError('Delete failed', msg);
+    }
   }
-  async function delPkg(id: string) {
-    try { await deleteCmsIVPackage(id); setDelConfirm(null); await load(); }
-    catch (err) { setActionError(err instanceof Error ? err.message : 'Could not delete package.'); }
-  }
-  // For built-in packages: if already overridden, remove the override row;
-  // if never overridden, create a disabled override so it hides from the site.
-  async function delBuiltinPkg(stableId: string, existing: CmsIVPackage | undefined, staticPkg: { slug: string; name: string; price: number }) {
+  async function delPkg(pkg: CmsIVPackage) {
+    const ok = await adminConfirm({
+      title: 'Delete this IV package?',
+      text: `"${pkg.name}" will be permanently deleted from the website and admin. This cannot be undone.`,
+      confirmText: 'Delete forever',
+      danger: true,
+    });
+    if (!ok) return;
     setActionError('');
     try {
+      if (pkg.image) {
+        try { await deletePackageImage(pkg.image); } catch { /* ignore */ }
+      }
+      await deleteCmsIVPackageHard(pkg.id, pkg.slug);
+      // Also remove any static override with the same slug so it cannot reappear
+      const staticId = `static-pkg-${pkg.slug}`;
+      if (pkg.id !== staticId) {
+        try { await deleteCmsIVPackageHard(staticId, pkg.slug); } catch { /* optional */ }
+      }
+      setDelConfirm(null);
+      setEditingPkg(null);
+      // Optimistic UI: drop from local state immediately
+      setIVPackages((prev) => prev.filter((x) => x.id !== pkg.id && x.slug !== pkg.slug));
+      await load();
+      await adminSuccess('Package deleted', `${pkg.name} has been permanently deleted.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not delete package.';
+      setActionError(msg);
+      await adminError('Delete failed', msg);
+    }
+  }
+
+  /** Permanently remove a built-in package from the live site + admin list. */
+  async function deleteBuiltinPkg(p: (typeof staticIVPackages)[number], existing: CmsIVPackage | undefined) {
+    const ok = await adminConfirm({
+      title: 'Delete this IV package?',
+      text: `"${p.name}" will be permanently deleted from the website and removed from this admin list. This cannot be undone.`,
+      confirmText: 'Delete forever',
+      danger: true,
+    });
+    if (!ok) return;
+    setActionError('');
+    const stableId = `static-pkg-${p.slug}`;
+    const now = new Date().toISOString();
+    try {
+      // Remove any existing CMS rows for this slug first
+      if (existing?.id) {
+        try { await deleteCmsIVPackageHard(existing.id, existing.slug); } catch { /* continue */ }
+      }
+      try { await deleteCmsIVPackageHard(stableId, p.slug); } catch { /* continue */ }
+
+      // Tombstone so the static code package never shows on the site again
+      await saveCmsIVPackage({
+        id: stableId,
+        slug: p.slug,
+        name: existing?.name || p.name,
+        price: existing?.price ?? p.price,
+        badge: '',
+        image: '',
+        tagline: '__DELETED__',
+        description: '',
+        dosages: '',
+        bestFor: '',
+        ingredients: '',
+        addOns: '',
+        enabled: false,
+        createdAt: existing?.createdAt || now,
+        updatedAt: now,
+      });
+      setDelConfirm(null);
+      setEditingPkg(null);
+      setIVPackages((prev) => {
+        const without = prev.filter((x) => x.slug !== p.slug && x.id !== stableId);
+        return [
+          ...without,
+          {
+            id: stableId,
+            slug: p.slug,
+            name: p.name,
+            price: p.price,
+            badge: '',
+            image: '',
+            tagline: '__DELETED__',
+            description: '',
+            dosages: '',
+            bestFor: '',
+            ingredients: '',
+            addOns: '',
+            enabled: false,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ];
+      });
+      await load();
+      await adminSuccess('Package deleted', `${p.name} has been permanently deleted.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not delete package.';
+      setActionError(msg);
+      await adminError('Delete failed', msg);
+    }
+  }
+
+  async function toggleCondEnabled(row: CmsCondition) {
+    setActionError('');
+    try {
+      await saveCmsCondition({ ...row, enabled: !row.enabled, updatedAt: new Date().toISOString() });
+      await load();
+      await adminToast(row.enabled ? 'Moved to draft' : 'Condition activated', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not update condition status.';
+      setActionError(msg);
+      await adminError('Update failed', msg);
+    }
+  }
+
+  async function toggleBuiltinCond(c: (typeof staticConditions)[number], existing: CmsCondition | undefined) {
+    setActionError('');
+    const stableId = `static-cond-${c.slug}`;
+    const now = new Date().toISOString();
+    try {
       if (existing) {
-        // Remove the override entirely — package goes back to its static defaults
-        await deleteCmsIVPackage(existing.id);
+        await saveCmsCondition({ ...existing, enabled: !existing.enabled, updatedAt: now });
+        await adminToast(existing.enabled ? 'Moved to draft' : 'Condition activated', 'success');
       } else {
-        // No override yet — create one marked as disabled to hide it
-        const now = new Date().toISOString();
+        await saveCmsCondition({
+          id: stableId,
+          slug: c.slug,
+          title: c.title,
+          href: c.href,
+          heroEyebrow: c.heroEyebrow,
+          shortDescription: c.shortDescription,
+          cardImage: c.cardImage,
+          heroImage: c.heroImage,
+          heroImageAlt: c.heroImageAlt,
+          overview: Array.isArray(c.overview) ? c.overview.join('\n\n') : '',
+          sections: (c.sections || []).map(s => `## ${s.heading}\n${s.body.join('\n\n')}`).join('\n\n'),
+          symptoms: (c.symptoms || []).join('\n'),
+          treatmentIntro: c.treatmentIntro,
+          ctaHeading: c.ctaHeading,
+          ctaBody: c.ctaBody,
+          metaTitle: c.metaTitle,
+          metaDescription: c.metaDescription,
+          enabled: false,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await adminToast('Moved to draft', 'success');
+      }
+      await load();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not update condition status.';
+      setActionError(msg);
+      await adminError('Update failed', msg);
+    }
+  }
+
+  async function togglePkgEnabled(row: CmsIVPackage) {
+    setActionError('');
+    try {
+      await saveCmsIVPackage({ ...row, enabled: !row.enabled, updatedAt: new Date().toISOString() });
+      await load();
+      await adminToast(row.enabled ? 'Moved to draft' : 'Package activated', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not update package status.';
+      setActionError(msg);
+      await adminError('Update failed', msg);
+    }
+  }
+
+  async function toggleBuiltinPkg(p: (typeof staticIVPackages)[number], existing: CmsIVPackage | undefined) {
+    setActionError('');
+    const stableId = `static-pkg-${p.slug}`;
+    const now = new Date().toISOString();
+    try {
+      if (existing) {
+        await saveCmsIVPackage({ ...existing, enabled: !existing.enabled, updatedAt: now });
+        await adminToast(existing.enabled ? 'Moved to draft' : 'Package activated', 'success');
+      } else {
         await saveCmsIVPackage({
           id: stableId,
-          slug: staticPkg.slug,
-          name: staticPkg.name,
-          price: staticPkg.price,
+          slug: p.slug,
+          name: p.name,
+          price: p.price,
           badge: '',
-          image: '',
+          image: p.image || '',
           tagline: '',
-          description: '',
+          description: p.description || '',
           dosages: '',
           bestFor: '',
           ingredients: '',
@@ -1047,13 +1321,16 @@ export function AdminDashboard() {
           createdAt: now,
           updatedAt: now,
         });
+        await adminToast('Moved to draft', 'success');
       }
-      setDelConfirm(null);
       await load();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not delete package.');
+      const msg = err instanceof Error ? err.message : 'Could not update package status.';
+      setActionError(msg);
+      await adminError('Update failed', msg);
     }
   }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     setAuthed(false);
@@ -1091,7 +1368,20 @@ export function AdminDashboard() {
     overview:'Overview', appointments:'Appointments', calendar:'Calendar',
     slots:'Slot Management', messages:'Contact Messages',
     conditions:'Conditions We Treat', 'iv-packages':'IV Packages',
+    blog:'Blog', settings:'Settings',
   };
+  const PAGE_ICON: Record<NavPage, React.ElementType> = {
+    overview: LayoutDashboard,
+    appointments: List,
+    calendar: CalendarRange,
+    slots: Clock,
+    messages: MessageSquare,
+    conditions: Activity,
+    'iv-packages': Syringe,
+    blog: FileText,
+    settings: Lock,
+  };
+  const PageIcon = PAGE_ICON[page];
 
   if (!sessionReady) {
     return (
@@ -1113,14 +1403,8 @@ export function AdminDashboard() {
           {/* Header */}
           <header className="bg-white px-7 py-4 flex items-center justify-between gap-4 shrink-0 z-10" style={{ borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#1e3a5f' }}>
-                {page==='overview' && <LayoutDashboard className="w-4 h-4 text-white"/>}
-                {page==='appointments' && <List className="w-4 h-4 text-white"/>}
-                {page==='calendar' && <CalendarRange className="w-4 h-4 text-white"/>}
-                {page==='slots' && <Clock className="w-4 h-4 text-white"/>}
-                {page==='messages' && <MessageSquare className="w-4 h-4 text-white"/>}
-                {page==='conditions' && <Activity className="w-4 h-4 text-white"/>}
-                {page==='iv-packages' && <Syringe className="w-4 h-4 text-white"/>}
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#1e3a5f' }}>
+                <PageIcon className="w-4 h-4 text-white" strokeWidth={2.25} />
               </div>
               <div>
                 <h1 className="font-bold text-slate-800 text-sm leading-tight">{PAGE_TITLE[page]}</h1>
@@ -1137,16 +1421,39 @@ export function AdminDashboard() {
                   onBlur={e=>{ e.currentTarget.style.background='#f8fafc'; e.currentTarget.style.borderColor='#e2e8f0'; }}
                 />
               </div>
-              <button onClick={load} title="Refresh"
-                className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"
+              <button onClick={() => { void load(); }} title="Refresh" disabled={refreshing}
+                className="w-8 h-8 flex items-center justify-center rounded-lg transition-all disabled:opacity-60"
                 style={{ border: '1px solid #e2e8f0', background: '#fff', color: '#64748b' }}
                 onMouseEnter={e=>{ e.currentTarget.style.borderColor='#3b82f6'; e.currentTarget.style.color='#3b82f6'; }}
                 onMouseLeave={e=>{ e.currentTarget.style.borderColor='#e2e8f0'; e.currentTarget.style.color='#64748b'; }}>
-                <RefreshCw className="w-3.5 h-3.5"/>
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}/>
               </button>
-              {/* Avatar */}
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg,#1e3a5f,#3b82f6)' }}>
-                A
+              {/* Avatar / profile */}
+              <div className="relative" ref={profileRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen((v) => !v)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow"
+                  style={{ background: 'linear-gradient(135deg,#1e3a5f,#3b82f6)' }}
+                  title="Account"
+                >
+                  {(adminEmail || 'A').charAt(0).toUpperCase()}
+                </button>
+                {profileOpen && (
+                  <div className="absolute right-0 top-10 z-50 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100" style={{ background: 'linear-gradient(135deg,#f8fafc,#eff6ff)' }}>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Signed in as</p>
+                      <p className="text-sm font-semibold text-slate-800 mt-0.5 break-all">{adminEmail || 'Admin'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setProfileOpen(false); void handleLogout(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4"/> Sign out
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </header>
@@ -1246,18 +1553,54 @@ export function AdminDashboard() {
                     {staticConditions.map(c=>{
                       const stableId=`static-cond-${c.slug}`;
                       const existing=conditions.find(x=>x.id===stableId);
+                      const isDraft = existing ? !existing.enabled : false;
+                      const editRow = existing || {
+                        id: stableId,
+                        slug: c.slug,
+                        title: c.title,
+                        href: c.href,
+                        heroEyebrow: c.heroEyebrow,
+                        shortDescription: c.shortDescription,
+                        cardImage: c.cardImage,
+                        heroImage: c.heroImage,
+                        heroImageAlt: c.heroImageAlt,
+                        overview: Array.isArray(c.overview) ? c.overview.join('\n\n') : '',
+                        sections: (c.sections || []).map(s => `## ${s.heading}\n${s.body.join('\n\n')}`).join('\n\n'),
+                        symptoms: (c.symptoms || []).join('\n'),
+                        treatmentIntro: c.treatmentIntro,
+                        ctaHeading: c.ctaHeading,
+                        ctaBody: c.ctaBody,
+                        metaTitle: c.metaTitle,
+                        metaDescription: c.metaDescription,
+                        enabled: true,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      };
                       return (
-                        <div key={c.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing?'border-orange-200':'border-ink-100'}`}>
-                          {c.cardImage&&<img src={c.cardImage} alt={c.title} className="w-12 h-9 rounded-lg object-cover shrink-0"/>}
+                        <div key={c.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing?'border-orange-200':'border-ink-100'} ${isDraft ? 'opacity-70' : ''}`}>
+                          {(existing?.cardImage || existing?.heroImage || c.cardImage) && <img src={existing?.cardImage || existing?.heroImage || c.cardImage} alt={c.title} className="w-12 h-9 rounded-lg object-cover shrink-0"/>}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-bold text-ink-900 text-xs">{existing?.title || c.title}</h3>
-                              {existing&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Edited</span>}
+                              {existing&&!isDraft&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Edited</span>}
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${isDraft?'bg-ink-100 text-ink-500':'bg-green-50 text-green-600 border border-green-200'}`}>{isDraft?'Draft':'Active'}</span>
                             </div>
                             <p className="text-[10px] text-ink-400">{existing ? `/${existing.slug}/` : c.href}</p>
                           </div>
-                          <button onClick={()=>setEditingCond(existing||{id:stableId,slug:c.slug,title:c.title,href:c.href,heroEyebrow:c.heroEyebrow,shortDescription:c.shortDescription,cardImage:c.cardImage,heroImage:c.heroImage,overview:Array.isArray(c.overview)?c.overview.join('\n'):'',symptoms:(c.symptoms||[]).join(', '),treatmentIntro:c.treatmentIntro,metaTitle:c.metaTitle,metaDescription:c.metaDescription,enabled:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
-                            className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 shrink-0 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onClick={()=>toggleBuiltinCond(c, existing)} title={isDraft?'Activate':'Set draft'}
+                              className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full transition-all">
+                              {isDraft?'Activate':'Draft'}
+                            </button>
+                            <button type="button" onClick={()=>setEditingCond(editRow)}
+                              className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 shrink-0 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
+                            {delConfirm===stableId
+                              ? <>
+                                  <button type="button" onClick={()=>existing ? delCond(existing.id) : toggleBuiltinCond(c, existing)} className="h-7 px-3 text-[11px] font-bold bg-red-500 hover:bg-red-600 text-white rounded-full">Confirm</button>
+                                  <button type="button" onClick={()=>setDelConfirm(null)} className="h-7 px-3 text-[11px] border border-ink-200 rounded-full text-ink-500">Cancel</button>
+                                </>
+                              : <button type="button" onClick={()=>setDelConfirm(stableId)} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-red-300 text-ink-400 hover:text-red-500 rounded-full transition-all" title="Delete / hide"><Trash2 className="w-3.5 h-3.5"/></button>}
+                          </div>
                         </div>
                       );
                     })}
@@ -1269,12 +1612,13 @@ export function AdminDashboard() {
                     <div className="grid gap-2">
                       {conditions.filter(c=>!c.id.startsWith('static-')).map(c=>(
                         <div key={c.id} className="bg-white rounded-xl border border-ink-100 p-4 flex items-center gap-4 shadow-soft">
-                          {c.cardImage&&<img src={c.cardImage} alt={c.title} className="w-12 h-9 rounded-lg object-cover shrink-0"/>}
+                          {(c.cardImage || c.heroImage) && <img src={c.cardImage || c.heroImage} alt={c.title} className="w-12 h-9 rounded-lg object-cover shrink-0"/>}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2"><h3 className="font-bold text-ink-900 text-xs">{c.title}</h3><span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${c.enabled?'bg-green-50 text-green-600 border border-green-200':'bg-ink-100 text-ink-500'}`}>{c.enabled?'Published':'Draft'}</span></div>
                             <p className="text-[10px] text-ink-400">/{c.slug}/</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onClick={()=>toggleCondEnabled(c)} className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full transition-all">{c.enabled?'Draft':'Activate'}</button>
                             <button onClick={()=>setEditingCond(c)} className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
                             {delConfirm===c.id?<><button onClick={()=>delCond(c.id)} className="h-7 px-3 text-[11px] font-bold bg-red-500 hover:bg-red-600 text-white rounded-full">Confirm</button><button onClick={()=>setDelConfirm(null)} className="h-7 px-3 text-[11px] border border-ink-200 rounded-full text-ink-500">Cancel</button></>:<button onClick={()=>setDelConfirm(c.id)} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-red-300 text-ink-400 hover:text-red-500 rounded-full transition-all"><Trash2 className="w-3.5 h-3.5"/></button>}
                           </div>
@@ -1303,52 +1647,57 @@ export function AdminDashboard() {
                 <div>
                   <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Built-in ({staticIVPackages.length})</p>
                   <div className="grid gap-2">
-                    {staticIVPackages.map(p=>{
+                    {staticIVPackages.filter(p => {
+                      const existing = ivPackages.find(x => x.id === `static-pkg-${p.slug}` || x.slug === p.slug);
+                      // Deleted packages disappear from the admin list entirely
+                      return existing?.tagline !== '__DELETED__';
+                    }).map(p=>{
                       const stableId=`static-pkg-${p.slug}`;
-                      const existing=ivPackages.find(x=>x.id===stableId);
-                      const isHidden = existing && !existing.enabled;
+                      const existing=ivPackages.find(x=>x.id===stableId || x.slug===p.slug);
+                      const isDraft = existing ? !existing.enabled : false;
                       return (
-                        <div key={p.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing && existing.enabled ? 'border-orange-200' : isHidden ? 'border-red-100 opacity-60' : 'border-ink-100'}`}>
-                          <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center shrink-0">💉</div>
+                        <div key={p.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing && existing.enabled ? 'border-orange-200' : isDraft ? 'border-ink-200 opacity-70' : 'border-ink-100'}`}>
+                          {(existing?.image || p.image)
+                            ? <img src={existing?.image || p.image} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0"/>
+                            : <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center shrink-0">💉</div>}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <h3 className="font-bold text-ink-900 text-xs">{existing?.name||p.name}</h3>
                               <span className="font-black text-primary-900 text-xs">${existing?.price||p.price}</span>
                               {existing && existing.enabled && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Edited</span>}
-                              {isHidden && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200">Hidden</span>}
+                              {isDraft && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-ink-100 text-ink-500">Draft</span>}
                             </div>
                             <p className="text-[10px] text-ink-400">/iv-packages/{existing?.slug || p.slug}/</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button onClick={()=>setEditingPkg(existing||{id:stableId,slug:p.slug,name:p.name,price:p.price,badge:'',image:'',tagline:'',description:'',dosages:'',bestFor:'',ingredients:'',addOns:'',enabled:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
+                            <button type="button" onClick={()=>toggleBuiltinPkg(p, existing)} title={isDraft?'Activate':'Set draft'}
+                              className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full transition-all">
+                              {isDraft?'Activate':'Draft'}
+                            </button>
+                            <button type="button" onClick={()=>setEditingPkg(existing||{id:stableId,slug:p.slug,name:p.name,price:p.price,badge:'',image:p.image||'',tagline:'',description:p.description||'',dosages:'',bestFor:'',ingredients:'',addOns:'',enabled:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
                               className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 shrink-0 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
-                            {delConfirm===stableId
-                              ? <>
-                                  <button onClick={()=>delBuiltinPkg(stableId, existing, p)} className="h-7 px-3 text-[11px] font-bold bg-red-500 hover:bg-red-600 text-white rounded-full">Confirm</button>
-                                  <button onClick={()=>setDelConfirm(null)} className="h-7 px-3 text-[11px] border border-ink-200 rounded-full text-ink-500">Cancel</button>
-                                </>
-                              : <button onClick={()=>setDelConfirm(stableId)} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-red-300 text-ink-400 hover:text-red-500 rounded-full transition-all" title={existing ? 'Reset to default' : 'Hide package'}><Trash2 className="w-3.5 h-3.5"/></button>
-                            }
+                            <button type="button" onClick={()=>void deleteBuiltinPkg(p, existing)} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-red-300 text-ink-400 hover:text-red-500 rounded-full transition-all" title="Delete permanently"><Trash2 className="w-3.5 h-3.5"/></button>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-                {ivPackages.filter(p=>!p.id.startsWith('static-')).length>0&&(
+                {ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== '__DELETED__').length>0&&(
                   <div>
-                    <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2 mt-4">Custom ({ivPackages.filter(p=>!p.id.startsWith('static-')).length})</p>
+                    <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2 mt-4">Custom ({ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== '__DELETED__').length})</p>
                     <div className="grid gap-2">
-                      {ivPackages.filter(p=>!p.id.startsWith('static-')).map(p=>(
+                      {ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== '__DELETED__').map(p=>(
                         <div key={p.id} className="bg-white rounded-xl border border-ink-100 p-4 flex items-center gap-4 shadow-soft">
-                          {p.image&&<img src={p.image} alt={p.name} className="w-10 h-10 rounded-xl object-contain bg-sky-50 p-1 shrink-0"/>}
+                          {p.image&&<img src={p.image} alt={p.name} className="w-10 h-10 rounded-xl object-cover bg-sky-50 shrink-0"/>}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2"><h3 className="font-bold text-ink-900 text-xs">{p.name}</h3><span className="font-black text-primary-900 text-xs">${p.price}</span>{p.badge&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">{p.badge}</span>}<span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${p.enabled?'bg-green-50 text-green-600 border border-green-200':'bg-ink-100 text-ink-500'}`}>{p.enabled?'Published':'Draft'}</span></div>
                             <p className="text-[10px] text-ink-400">/iv-packages/{p.slug}/</p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button onClick={()=>setEditingPkg(p)} className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
-                            {delConfirm===p.id?<><button onClick={()=>delPkg(p.id)} className="h-7 px-3 text-[11px] font-bold bg-red-500 hover:bg-red-600 text-white rounded-full">Confirm</button><button onClick={()=>setDelConfirm(null)} className="h-7 px-3 text-[11px] border border-ink-200 rounded-full text-ink-500">Cancel</button></>:<button onClick={()=>setDelConfirm(p.id)} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-red-300 text-ink-400 hover:text-red-500 rounded-full transition-all"><Trash2 className="w-3.5 h-3.5"/></button>}
+                            <button type="button" onClick={()=>togglePkgEnabled(p)} className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full transition-all">{p.enabled?'Draft':'Activate'}</button>
+                            <button type="button" onClick={()=>setEditingPkg(p)} className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
+                            <button type="button" onClick={()=>void delPkg(p)} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-red-300 text-ink-400 hover:text-red-500 rounded-full transition-all" title="Delete permanently"><Trash2 className="w-3.5 h-3.5"/></button>
                           </div>
                         </div>
                       ))}
@@ -1358,6 +1707,14 @@ export function AdminDashboard() {
                 </>
                 )}
               </div>
+            )}
+
+            {page === 'blog' && (
+              <AdminBlogPanel onError={setActionError} />
+            )}
+
+            {page === 'settings' && (
+              <AdminSettingsPanel onError={setActionError} />
             )}
           </main>
         </div>

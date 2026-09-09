@@ -223,6 +223,7 @@ export async function handleReviewAppointment(
     time: String(appt.time || ''),
     location: String(appt.location || ''),
     id,
+    reason: action === 'reject' ? reason : undefined,
   };
 
   let emailSent = true;

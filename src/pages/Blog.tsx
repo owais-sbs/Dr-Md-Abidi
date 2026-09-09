@@ -1,14 +1,38 @@
+import { useEffect, useState } from 'react';
 import { Seo } from '@/components/common/Seo';
 import { PageHero } from '@/components/common/PageHero';
 import { BlogCard } from '@/components/blog/BlogCard';
 import { CTASection } from '@/components/common/CTASection';
-import { blogPosts } from '@/data/blogPosts';
+import { blogPosts, type BlogPost } from '@/data/blogPosts';
+import { getCmsBlogPosts } from '@/data/cms';
+import { cmsBlogToPost } from '@/lib/blogCms';
 import { motion } from 'framer-motion';
 import { staggerContainer, viewport } from '@/animations/variants';
 
 const heroImg = 'https://images.pexels.com/photos/8460095/pexels-photo-8460095.jpeg?auto=compress&cs=tinysrgb&h=900&w=1600';
 
 export function Blog() {
+  const [posts, setPosts] = useState<BlogPost[]>(blogPosts);
+
+  useEffect(() => {
+    let alive = true;
+    getCmsBlogPosts()
+      .then((cms) => {
+        if (!alive) return;
+        const enabled = cms.filter((p) => p.enabled).map(cmsBlogToPost);
+        const bySlug = new Map<string, BlogPost>();
+        for (const p of blogPosts) bySlug.set(p.slug, p);
+        for (const p of enabled) bySlug.set(p.slug, p);
+        setPosts(Array.from(bySlug.values()).sort((a, b) => {
+          const da = Date.parse(a.date) || 0;
+          const db = Date.parse(b.date) || 0;
+          return db - da;
+        }));
+      })
+      .catch(() => { /* keep static posts */ });
+    return () => { alive = false; };
+  }, []);
+
   return (
     <>
       <Seo
@@ -32,7 +56,7 @@ export function Blog() {
             viewport={viewport}
             className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
           >
-            {blogPosts.map((p) => (
+            {posts.map((p) => (
               <BlogCard key={p.slug} post={p} />
             ))}
           </motion.div>

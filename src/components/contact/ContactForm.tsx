@@ -3,18 +3,29 @@ import { motion } from 'framer-motion';
 import { Send, CheckCircle2, Loader2 } from 'lucide-react';
 import { fadeUp, viewport } from '@/animations/variants';
 import { saveContactMessage, generateId } from '@/data/appointments';
+import { LegalConsentCheckbox } from '@/components/common/LegalConsentCheckbox';
 
 export function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [legalAgreed, setLegalAgreed] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm((f) => ({
+      ...f,
+      [name]: name === 'phone' ? value.replace(/\D/g, '').slice(0, 15) : value,
+    }));
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!legalAgreed) {
+      setError('Please agree to the Privacy Policy and Terms & Conditions.');
+      return;
+    }
     setError('');
     setSending(true);
     try {
@@ -61,7 +72,7 @@ export function ContactForm() {
         <Field label="Full Name" name="name" value={form.name} onChange={onChange} required />
         <Field label="Email" name="email" type="email" value={form.email} onChange={onChange} required />
       </div>
-      <Field label="Phone" name="phone" type="tel" value={form.phone} onChange={onChange} />
+      <Field label="Phone" name="phone" type="tel" value={form.phone} onChange={onChange} inputMode="numeric" pattern="[0-9]*" />
       <div>
         <label htmlFor="message" className="block text-sm font-medium text-ink-700 mb-1.5">Message</label>
         <textarea
@@ -75,6 +86,7 @@ export function ContactForm() {
           placeholder="How can we help you?"
         />
       </div>
+      <LegalConsentCheckbox id="contact-consent" checked={legalAgreed} onChange={setLegalAgreed} />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={sending} className="btn-primary w-full sm:w-auto disabled:opacity-60">
         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -85,10 +97,12 @@ export function ContactForm() {
 }
 
 function Field({
-  label, name, type = 'text', value, onChange, required,
+  label, name, type = 'text', value, onChange, required, inputMode, pattern,
 }: {
   label: string; name: string; type?: string; value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; required?: boolean;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  pattern?: string;
 }) {
   return (
     <div>
@@ -100,6 +114,9 @@ function Field({
         required={required}
         value={value}
         onChange={onChange}
+        inputMode={inputMode}
+        pattern={pattern}
+        autoComplete={name === 'phone' ? 'tel' : undefined}
         className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-ink-800 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
       />
     </div>

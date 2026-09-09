@@ -28,7 +28,7 @@ export function PageHero({ title, description, eyebrow, image, crumbs }: PageHer
                 {eyebrow}
               </motion.span>
             )}
-            <motion.h1 variants={fadeUp} className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-white text-balance leading-tight">
+            <motion.h1 variants={fadeUp} className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-serif font-bold !text-white text-balance leading-tight">
               {title}
             </motion.h1>
             {description && (

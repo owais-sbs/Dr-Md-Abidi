@@ -6,7 +6,7 @@ import { staggerContainer, staggerFast, fadeUp, fadeDown, scaleIn, viewport } fr
 import { SectionHeading } from '@/components/common/SectionHeading';
 import { ConditionCard } from '@/components/conditions/ConditionCard';
 import { conditions } from '@/data/conditions';
-import { getCmsConditions, type CmsCondition } from '@/data/cms';
+import { getCmsConditions, cmsConditionToCondition, type CmsCondition } from '@/data/cms';
 import { useCmsRealtime } from '@/lib/cmsLive';
 
 export function ConditionsSection() {
@@ -37,13 +37,13 @@ export function ConditionsSection() {
       ...c,
       title: ov.title || c.title,
       shortDescription: ov.shortDescription || c.shortDescription,
-      cardImage: ov.cardImage || c.cardImage,
+      cardImage: ov.cardImage || ov.heroImage || c.cardImage,
       heroEyebrow: ov.heroEyebrow || c.heroEyebrow,
       href: `/${ov.slug || c.slug}/`,
     }];
   });
   return (
-    <section className="bg-ink-50 overflow-hidden">
+    <section className="bg-ink-50">
       <div className="container-page py-20">
 
         <motion.div
@@ -68,38 +68,11 @@ export function ConditionsSection() {
           viewport={viewport}
           className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {displayConditions.map((c, i) => (
-            <motion.div
-              key={c.slug}
-              variants={scaleIn}
-              custom={i}
-              whileHover={{ y: -6, boxShadow: '0 20px 48px -12px rgba(20,38,87,0.18)' }}
-              transition={{ duration: 0.25 }}
-            >
-              <ConditionCard condition={c} />
-            </motion.div>
+          {displayConditions.map((c) => (
+            <ConditionCard key={c.slug} condition={c} />
           ))}
-          {/* CMS-added conditions */}
-          {cmsConditions.map((c, i) => (
-            <motion.div key={c.id} variants={scaleIn} custom={displayConditions.length + i}
-              whileHover={{ y: -6, boxShadow: '0 20px 48px -12px rgba(20,38,87,0.18)' }} transition={{ duration: 0.25 }}>
-              <div className="card overflow-hidden flex flex-col group hover:shadow-card transition-shadow">
-                {c.cardImage && (
-                  <div className="relative aspect-[16/10] overflow-hidden">
-                    <img src={c.cardImage} alt={c.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-ink-950/50 via-transparent to-transparent" />
-                    {c.heroEyebrow && <span className="absolute top-3 left-3 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-700 shadow-sm">{c.heroEyebrow}</span>}
-                  </div>
-                )}
-                <div className="p-5 flex flex-col flex-1">
-                  <h3 className="text-lg font-bold text-ink-900 group-hover:text-primary-700 transition-colors">{c.title}</h3>
-                  <p className="mt-2 text-sm text-ink-600 leading-relaxed line-clamp-3">{c.shortDescription}</p>
-                  <Link to={`/${c.slug}/`} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 group-hover:gap-2.5 transition-all">
-                    Learn More <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
+          {cmsConditions.map((c) => (
+            <ConditionCard key={c.id} condition={cmsConditionToCondition(c)} />
           ))}
         </motion.div>
 

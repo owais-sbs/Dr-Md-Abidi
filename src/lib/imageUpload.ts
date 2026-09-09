@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-const BUCKET = 'iv-package-images';
+const BUCKET = 'cms-images';
 
 /**
  * Uploads an image file to Supabase Storage and returns its public URL.
@@ -8,13 +8,26 @@ const BUCKET = 'iv-package-images';
  */
 export async function uploadPackageImage(file: File): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const path = `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+  const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
 
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, file, { upsert: false, contentType: file.type });
 
-  if (error) throw new Error(`Image upload failed: ${error.message}`);
+  if (error) {
+    // Fallback to legacy bucket name if cms-images is not created yet
+    if (/bucket|not found|does not exist/i.test(error.message)) {
+      const legacy = 'iv-package-images';
+      const legacyPath = `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+      const { error: e2 } = await supabase.storage
+        .from(legacy)
+        .upload(legacyPath, file, { upsert: false, contentType: file.type });
+      if (e2) throw new Error(`Image upload failed: ${e2.message}`);
+      const { data } = supabase.storage.from(legacy).getPublicUrl(legacyPath);
+      return data.publicUrl;
+    }
+    throw new Error(`Image upload failed: ${error.message}`);
+  }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
@@ -26,12 +39,14 @@ export async function uploadPackageImage(file: File): Promise<string> {
  */
 export async function deletePackageImage(publicUrl: string): Promise<void> {
   try {
-    // Extract the path after the bucket name in the URL
-    const marker = `/${BUCKET}/`;
-    const idx = publicUrl.indexOf(marker);
-    if (idx === -1) return; // not our bucket — skip
-    const path = publicUrl.slice(idx + marker.length);
-    await supabase.storage.from(BUCKET).remove([path]);
+    for (const bucket of [BUCKET, 'iv-package-images']) {
+      const marker = `/${bucket}/`;
+      const idx = publicUrl.indexOf(marker);
+      if (idx === -1) continue;
+      const path = publicUrl.slice(idx + marker.length);
+      await supabase.storage.from(bucket).remove([path]);
+      return;
+    }
   } catch {
     // non-critical — ignore
   }

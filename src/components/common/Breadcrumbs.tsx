@@ -41,7 +41,7 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
   }, [items]);
 
   return (
-    <nav aria-label="Breadcrumb" className="container-page pt-6">
+    <nav aria-label="Breadcrumb" className="container-page pt-4 pb-2">
       <ol className="flex flex-wrap items-center gap-1.5 text-sm text-ink-500">
         <li>
           <Link to="/" className="hover:text-primary-700">Home</Link>

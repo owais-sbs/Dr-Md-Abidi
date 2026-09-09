@@ -8,7 +8,7 @@ export const site = {
   phoneHref: 'tel:732-840-8402',
   email: 'admin@mdabidi.com',
   emailHref: 'mailto:admin@mdabidi.com',
-  bookingUrl: '/contact-us/',
+  bookingUrl: '/book/',
   hours: '09:00 AM – 04:00 PM',
   locations: [
     {
