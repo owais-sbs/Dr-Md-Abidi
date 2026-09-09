@@ -64,7 +64,6 @@ export function CmsIVPackageDetail() {
 
       {/* Hero */}
       <section className="bg-white overflow-hidden">
-        <div className="h-1.5 w-full bg-gradient-to-r from-primary-900 via-sky-300 to-orange-500" />
         <div className="container-page py-10 lg:py-14">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
             {/* Left */}

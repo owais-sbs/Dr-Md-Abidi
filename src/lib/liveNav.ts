@@ -55,7 +55,11 @@ export function mergeLiveNav(
         ...item,
         children: [
           ...children,
-          ...pkgCustom.map(p => ({ label: p.name, href: `/iv-packages/${p.slug}/` })),
+          ...pkgCustom.map(p => ({
+            // Strip any price suffixes like " - 3 for $900" or " $999" from nav labels
+            label: p.name.replace(/\s*[-–]\s*\d+\s+for\s+\$[\d,]+/i, '').replace(/\s+\$[\d,]+$/, '').trim(),
+            href: `/iv-packages/${p.slug}/`,
+          })),
         ],
       };
     }

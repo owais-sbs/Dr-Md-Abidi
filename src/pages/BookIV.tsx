@@ -637,7 +637,7 @@ export function BookIV() {
                   {/* ══ STEP 2: OTP ══ */}
                   {step === 2 && (
                     <motion.div key="s2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
-                      <div className="bg-white rounded-2xl shadow-soft border border-ink-100 p-8">
+                      <div className="bg-white rounded-2xl shadow-soft border border-ink-100 p-5 sm:p-8">
                         <div className="w-14 h-14 rounded-2xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
                           <Mail className="w-7 h-7 text-sky-500" />
                         </div>
@@ -647,7 +647,7 @@ export function BookIV() {
                         <div className="max-w-md mx-auto space-y-4">
                           <div>
                             <label className="block text-xs font-semibold text-ink-700 mb-1.5">Email Address <span className="text-red-400">*</span></label>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                               <input ref={emailInputRef} type="email" value={email} onChange={e => { setEmail(e.target.value); if (otpSent) resetOtp(); }} placeholder="your@email.com"
                                 className={`flex-1 border-2 rounded-xl px-4 py-3 text-sm outline-none transition-all duration-500 ${
                                   guideEmail
@@ -656,7 +656,7 @@ export function BookIV() {
                                 }`}
                                 disabled={otpSent && !verificationToken} />
                               <button onClick={handleSendOtp} disabled={sendingOtp || (otpSent && resendIn > 0)}
-                                className="inline-flex items-center gap-1.5 bg-primary-900 hover:bg-primary-800 disabled:opacity-50 text-white font-semibold text-xs px-4 py-3 rounded-xl transition-all whitespace-nowrap">
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-primary-900 hover:bg-primary-800 disabled:opacity-50 text-white font-semibold text-sm px-5 py-3 rounded-xl transition-all whitespace-nowrap">
                                 {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : otpSent ? (resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend OTP') : 'Send OTP'}
                               </button>
                             </div>
@@ -727,9 +727,9 @@ export function BookIV() {
 
                         <div className="bg-white rounded-2xl shadow-soft border border-ink-100 overflow-hidden">
                           {/* Form header */}
-                          <div className="border-b border-ink-100 px-8 py-5 flex items-center justify-between">
+                          <div className="border-b border-ink-100 px-5 sm:px-8 py-5 flex items-center justify-between">
                             <div>
-                              <h2 className="text-lg font-serif font-bold text-ink-900">IV Hydration Medical History Form</h2>
+                              <h2 className="text-base sm:text-lg font-serif font-bold text-ink-900">IV Hydration Medical History Form</h2>
                               <p className="text-xs text-ink-500 mt-0.5">Date: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                             </div>
                             <div className="text-right text-xs text-ink-500">
@@ -738,10 +738,10 @@ export function BookIV() {
                             </div>
                           </div>
 
-                          <div className="p-8 space-y-8">
+                          <div className="p-5 sm:p-8 space-y-8">
 
                             {/* ── Basic Info ── */}
-                            <div className="grid sm:grid-cols-2 gap-5">
+                            <div className="grid sm:grid-cols-2 gap-6">
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Full Name <span className="text-red-400">*</span></label>
                                 <input ref={nameInputRef} required type="text" value={form.name} onChange={e => setF('name', e.target.value)} placeholder="First Last" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
@@ -880,11 +880,11 @@ export function BookIV() {
                             <LegalConsentCheckbox id="book-iv-consent" checked={legalAgreed} onChange={setLegalAgreed} />
 
                             {/* ── Submit ── */}
-                            <div className="flex gap-3 pt-2">
-                              <button type="button" onClick={() => setStep(2)} className="flex-1 inline-flex items-center justify-center gap-2 border-2 border-ink-200 text-ink-700 font-semibold px-5 py-3.5 rounded-full text-sm hover:border-primary-900 transition-all">
+                            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                              <button type="button" onClick={() => setStep(2)} className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 border-2 border-ink-200 text-ink-700 font-semibold px-5 py-3.5 rounded-full text-sm hover:border-primary-900 transition-all">
                                 <ArrowLeft className="w-4 h-4" /> Back
                               </button>
-                              <button type="submit" disabled={submitting} className="flex-[2] inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold px-6 py-3.5 rounded-full transition-all text-sm">
+                              <button type="submit" disabled={submitting} className="w-full sm:flex-[2] inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold px-6 py-3.5 rounded-full transition-all text-sm">
                                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : <>Submit Booking Request <ChevronRight className="w-4 h-4" /></>}
                               </button>
                             </div>
@@ -908,7 +908,10 @@ export function BookIV() {
                   Thank you, <strong>{form.name.split(' ')[0]}</strong>. Your booking request has been submitted. Dr. Abidi will review your intake form and confirm your appointment via email.
                 </p>
                 <div className="bg-ink-50 border border-ink-100 rounded-xl p-5 mb-6 text-left space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-ink-500">Booking ID</span><span className="font-bold text-primary-900">{savedId}</span></div>
+                  <div className="flex flex-col xs:flex-row xs:justify-between gap-1">
+                    <span className="text-ink-500 shrink-0">Booking ID</span>
+                    <span className="font-bold text-primary-900 break-all text-xs sm:text-sm">{savedId}</span>
+                  </div>
                   <div className="flex justify-between"><span className="text-ink-500">Service</span><span className="font-semibold">{pkgObj?.name}</span></div>
                   <div className="flex justify-between"><span className="text-ink-500">Date</span><span className="font-semibold">{formatDate(selectedDate)}</span></div>
                   <div className="flex justify-between"><span className="text-ink-500">Time</span><span className="font-semibold">{selectedTime}</span></div>

@@ -39,14 +39,14 @@ export const IV_ADD_ONS: IvAddOn[] = [
 
 export const IV_PACKAGE_DEALS: IvPackageDeal[] = [
   {
-    title: 'Immunify & Power-Up Package',
+    title: 'Immunify & Power-Up Bundle',
     packages: 'Immunify & Power-Up',
     dealPrice: '3 for $900',
     pricePerUnit: '$300 per infusion',
     description: 'Special 3-session bundle for Immunify or Power-Up infusions.',
   },
   {
-    title: 'FOY & Go With The Flow Package',
+    title: 'FOY & Go With The Flow Bundle',
     packages: 'FOY & Go With The Flow',
     dealPrice: '3 for $975',
     pricePerUnit: '$325 per infusion',
