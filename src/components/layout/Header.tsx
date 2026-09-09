@@ -5,19 +5,6 @@ import { ChevronDown, Phone, X } from 'lucide-react';
 import { site } from '@/data/site';
 import { useLiveNav } from '@/lib/liveNav';
 
-const BROCHURE_SLUGS = new Set([
-  'power-up',
-  'immunify',
-  'go-with-the-flow',
-  'fountain-of-youth',
-  'myers-cocktail',
-  'saline',
-]);
-
-function getSlug(href: string): string {
-  return href.replace(/^\/|\/$/g, '').split('/').pop() || '';
-}
-
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -76,66 +63,23 @@ export function Header() {
                   {item.children && <ChevronDown className="w-4 h-4 opacity-70" />}
                 </Link>
                 {item.children && (
-                  item.href === '/iv-packages/' ? (
-                    <div className="absolute -left-16 top-full pt-2 opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200 z-[9999]">
-                      <div className="bg-white rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,0.16)] border border-ink-100 p-4 w-[540px]">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-0.5">
-                            {item.children
-                              .filter((c) => BROCHURE_SLUGS.has(getSlug(c.href)))
-                              .map((child) => (
-                                <Link
-                                  key={child.href}
-                                  to={child.href}
-                                  className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                                    isActive(child.href)
-                                      ? 'text-primary-900 bg-primary-50 font-bold'
-                                      : 'text-ink-800 hover:text-primary-900 hover:bg-primary-50/70 font-medium'
-                                  }`}
-                                >
-                                  {child.label}
-                                </Link>
-                              ))}
-                          </div>
-                          <div className="border-l border-ink-100 pl-4 space-y-0.5">
-                            {item.children
-                              .filter((c) => !BROCHURE_SLUGS.has(getSlug(c.href)))
-                              .map((child) => (
-                                <Link
-                                  key={child.href}
-                                  to={child.href}
-                                  className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                                    isActive(child.href)
-                                      ? 'text-primary-900 bg-primary-50 font-bold'
-                                      : 'text-ink-600 hover:text-primary-900 hover:bg-primary-50/70 font-normal'
-                                  }`}
-                                >
-                                  {child.label}
-                                </Link>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
+                  <div className="absolute left-0 top-full pt-2 opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200 z-[9999]">
+                    <div className="bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-ink-100 p-2 w-72 max-h-[75vh] overflow-y-auto">
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          to={child.href}
+                          className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                            isActive(child.href)
+                              ? 'text-primary-900 bg-primary-50 font-semibold'
+                              : 'text-ink-600 hover:text-primary-900 hover:bg-primary-50/70'
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
                     </div>
-                  ) : (
-                    <div className="absolute left-0 top-full pt-2 opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200 z-[9999]">
-                      <div className="bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-ink-100 p-2 w-72 max-h-[75vh] overflow-y-auto">
-                        {item.children.map((child) => (
-                          <Link
-                            key={child.href}
-                            to={child.href}
-                            className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                              isActive(child.href)
-                                ? 'text-primary-900 bg-primary-50 font-semibold'
-                                : 'text-ink-600 hover:text-primary-900 hover:bg-primary-50/70'
-                            }`}
-                          >
-                            {child.label}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )
+                  </div>
                 )}
               </div>
             ))}
