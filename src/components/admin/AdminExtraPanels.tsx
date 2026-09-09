@@ -216,6 +216,27 @@ function BlogForm({ initial, onSave, onCancel }: {
   );
 }
 
+async function readAdminUsersResponse(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  let data: Record<string, unknown> = {};
+  if (text) {
+    try {
+      data = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      const preview = text.replace(/\s+/g, ' ').trim().slice(0, 160);
+      throw new Error(
+        res.ok
+          ? `Unexpected server response: ${preview || '(empty)'}`
+          : preview || `Server error (${res.status}). Redeploy so /api/admin/users is live, and set SUPABASE_SERVICE_ROLE_KEY.`,
+      );
+    }
+  }
+  if (!res.ok) {
+    throw new Error(String(data.error || `Request failed (${res.status}).`));
+  }
+  return data;
+}
+
 export function AdminSettingsPanel({ onError }: { onError: (msg: string) => void }) {
   const [users, setUsers] = useState<{ id: string; email: string; createdAt?: string; lastSignInAt?: string }[]>([]);
   const [email, setEmail] = useState('');
@@ -232,14 +253,14 @@ export function AdminSettingsPanel({ onError }: { onError: (msg: string) => void
     try {
       setLoading(true);
       const access = await token();
+      if (!access) throw new Error('Please sign in as an administrator.');
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
         body: JSON.stringify({ action: 'list' }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not load users.');
-      setUsers(data.users || []);
+      const data = await readAdminUsersResponse(res);
+      setUsers((data.users as typeof users) || []);
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Could not load admin users.');
       setUsers([]);
@@ -255,17 +276,18 @@ export function AdminSettingsPanel({ onError }: { onError: (msg: string) => void
     setBusy(true);
     try {
       const access = await token();
+      if (!access) throw new Error('Please sign in as an administrator.');
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
         body: JSON.stringify({ action: 'create', email, password }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not create user.');
+      await readAdminUsersResponse(res);
+      const createdEmail = email;
       setEmail('');
       setPassword('');
       await load();
-      await adminSuccess('Admin user created', email);
+      await adminSuccess('Admin user created', createdEmail);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not create user.';
       onError(msg);
@@ -286,13 +308,13 @@ export function AdminSettingsPanel({ onError }: { onError: (msg: string) => void
     setBusy(true);
     try {
       const access = await token();
+      if (!access) throw new Error('Please sign in as an administrator.');
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
         body: JSON.stringify({ action: 'delete', id }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not delete user.');
+      await readAdminUsersResponse(res);
       await load();
       await adminToast('Admin user deleted', 'success');
     } catch (err) {
