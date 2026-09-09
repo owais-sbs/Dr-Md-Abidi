@@ -1019,6 +1019,41 @@ export function AdminDashboard() {
     try { await deleteCmsIVPackage(id); setDelConfirm(null); await load(); }
     catch (err) { setActionError(err instanceof Error ? err.message : 'Could not delete package.'); }
   }
+  // For built-in packages: if already overridden, remove the override row;
+  // if never overridden, create a disabled override so it hides from the site.
+  async function delBuiltinPkg(stableId: string, existing: CmsIVPackage | undefined, staticPkg: { slug: string; name: string; price: number }) {
+    setActionError('');
+    try {
+      if (existing) {
+        // Remove the override entirely — package goes back to its static defaults
+        await deleteCmsIVPackage(existing.id);
+      } else {
+        // No override yet — create one marked as disabled to hide it
+        const now = new Date().toISOString();
+        await saveCmsIVPackage({
+          id: stableId,
+          slug: staticPkg.slug,
+          name: staticPkg.name,
+          price: staticPkg.price,
+          badge: '',
+          image: '',
+          tagline: '',
+          description: '',
+          dosages: '',
+          bestFor: '',
+          ingredients: '',
+          addOns: '',
+          enabled: false,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      setDelConfirm(null);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not delete package.');
+    }
+  }
   async function handleLogout() {
     await supabase.auth.signOut();
     setAuthed(false);
@@ -1270,19 +1305,30 @@ export function AdminDashboard() {
                     {staticIVPackages.map(p=>{
                       const stableId=`static-pkg-${p.slug}`;
                       const existing=ivPackages.find(x=>x.id===stableId);
+                      const isHidden = existing && !existing.enabled;
                       return (
-                        <div key={p.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing?'border-orange-200':'border-ink-100'}`}>
+                        <div key={p.slug} className={`bg-white rounded-xl border p-4 flex items-center gap-4 shadow-soft ${existing && existing.enabled ? 'border-orange-200' : isHidden ? 'border-red-100 opacity-60' : 'border-ink-100'}`}>
                           <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center shrink-0">💉</div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <h3 className="font-bold text-ink-900 text-xs">{existing?.name||p.name}</h3>
                               <span className="font-black text-primary-900 text-xs">${existing?.price||p.price}</span>
-                              {existing&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Edited</span>}
+                              {existing && existing.enabled && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">Edited</span>}
+                              {isHidden && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200">Hidden</span>}
                             </div>
                             <p className="text-[10px] text-ink-400">/iv-packages/{existing?.slug || p.slug}/</p>
                           </div>
-                          <button onClick={()=>setEditingPkg(existing||{id:stableId,slug:p.slug,name:p.name,price:p.price,badge:'',image:'',tagline:'',description:'',dosages:'',bestFor:'',ingredients:'',addOns:'',enabled:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
-                            className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 shrink-0 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button onClick={()=>setEditingPkg(existing||{id:stableId,slug:p.slug,name:p.name,price:p.price,badge:'',image:'',tagline:'',description:'',dosages:'',bestFor:'',ingredients:'',addOns:'',enabled:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
+                              className="h-7 px-3 text-[11px] font-bold border border-ink-200 hover:border-primary-900 text-ink-600 hover:text-primary-900 rounded-full flex items-center gap-1.5 shrink-0 transition-all"><Pencil className="w-3 h-3"/>Edit</button>
+                            {delConfirm===stableId
+                              ? <>
+                                  <button onClick={()=>delBuiltinPkg(stableId, existing, p)} className="h-7 px-3 text-[11px] font-bold bg-red-500 hover:bg-red-600 text-white rounded-full">Confirm</button>
+                                  <button onClick={()=>setDelConfirm(null)} className="h-7 px-3 text-[11px] border border-ink-200 rounded-full text-ink-500">Cancel</button>
+                                </>
+                              : <button onClick={()=>setDelConfirm(stableId)} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-red-300 text-ink-400 hover:text-red-500 rounded-full transition-all" title={existing ? 'Reset to default' : 'Hide package'}><Trash2 className="w-3.5 h-3.5"/></button>
+                            }
+                          </div>
                         </div>
                       );
                     })}
