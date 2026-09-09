@@ -52,7 +52,21 @@ export function ConditionDetail({ slug: slugProp }: { slug?: string }) {
 
   return (
     <>
-      <Seo title={condition.metaTitle} description={condition.metaDescription} />
+      <Seo title={condition.metaTitle} description={condition.metaDescription} jsonLd={{
+        '@context': 'https://schema.org',
+        '@type': 'MedicalWebPage',
+        name: condition.metaTitle,
+        description: condition.metaDescription,
+        about: {
+          '@type': 'MedicalCondition',
+          name: condition.title,
+          description: condition.shortDescription || condition.metaDescription,
+        },
+        specialty: 'Rheumatology',
+        audience: {
+          '@type': 'Patient',
+        },
+      }} />
       <ConditionHero condition={condition} />
       <ConditionContent condition={condition} />
       <RelatedConditions conditions={conditions} currentSlug={condition.slug} />

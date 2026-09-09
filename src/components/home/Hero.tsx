@@ -14,7 +14,14 @@ export function Hero() {
 
       {/* Background video */}
       <div className="absolute inset-0">
-        <video autoPlay muted loop playsInline className="w-full h-full object-cover">
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="w-full h-full object-cover"
+          aria-label="MD Abidi Arthritis Institute clinic and patient care"
+        >
           <source src="/home.mp4" type="video/mp4" />
         </video>
         {/* Light deep-blue overlay so video shows through */}

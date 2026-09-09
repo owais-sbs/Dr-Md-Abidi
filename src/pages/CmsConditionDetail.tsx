@@ -41,6 +41,18 @@ export function CmsConditionDetail() {
       <Seo
         title={condition.metaTitle || `${condition.title} | MD Abidi Arthritis Institute`}
         description={condition.metaDescription || condition.shortDescription}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'MedicalWebPage',
+          name: condition.metaTitle || condition.title,
+          description: condition.metaDescription || condition.shortDescription,
+          about: {
+            '@type': 'MedicalCondition',
+            name: condition.title,
+            description: condition.shortDescription || condition.metaDescription,
+          },
+          specialty: 'Rheumatology',
+        }}
       />
 
       <Breadcrumbs items={[{ label: 'Conditions We Treat', href: '/conditions-we-treat/' }, { label: condition.title }]} />

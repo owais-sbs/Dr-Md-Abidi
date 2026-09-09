@@ -106,11 +106,27 @@ export function BookIV() {
       const all = await getCmsIVPackages();
       const cms = all
         .filter(p => p.enabled && !p.id.startsWith('static-pkg-'))
-        .map(p => ({ name: p.name, slug: p.slug, price: p.price, image: p.image || '' }));
+        .map(p => ({
+          name: p.name,
+          slug: p.slug,
+          price: p.price,
+          image: p.image || '',
+          description: p.description || '',
+          includes: [] as string[],
+        }));
       const overrides = all.filter(p => p.enabled && p.id.startsWith('static-pkg-'));
       const merged = IV_PACKAGES.map(p => {
         const ov = overrides.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
-        return ov ? { name: ov.name || p.name, slug: ov.slug || p.slug, price: ov.price || p.price, image: ov.image || p.image } : p;
+        return ov
+          ? {
+              ...p,
+              name: ov.name || p.name,
+              slug: ov.slug || p.slug,
+              price: ov.price || p.price,
+              image: ov.image || p.image,
+              description: ov.description || p.description,
+            }
+          : p;
       });
       setAllPackages([...merged, ...cms]);
     } catch {
@@ -416,7 +432,7 @@ export function BookIV() {
           <button onClick={() => navigate('/iv-packages/')} className="inline-flex items-center gap-1.5 text-sky-200 hover:text-white text-sm transition-colors">
             <ArrowLeft className="w-4 h-4" /> IV Packages
           </button>
-          <span className="font-serif font-bold text-base">Book IV Therapy Appointment</span>
+          <h1 className="font-serif font-bold text-base">Book IV Therapy Appointment</h1>
           <span className="text-sky-300 text-sm hidden sm:block">Step {Math.min(step + 1, 4)} of 4</span>
         </div>
       </div>

@@ -82,10 +82,10 @@ export function Footer() {
               {site.locations.map((loc) => (
                 <li key={loc.label} className="flex items-start gap-3">
                   <MapPin className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
-                  <span className="text-sky-200/70">
+                  <address className="text-sky-200/70 not-italic">
                     <span className="block font-medium text-sky-100">{loc.label}</span>
                     {loc.lines.map((l) => (<span key={l} className="block">{l}</span>))}
-                  </span>
+                  </address>
                 </li>
               ))}
               <li className="flex items-center gap-3">

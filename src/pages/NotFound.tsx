@@ -5,7 +5,12 @@ import { Home as HomeIcon } from 'lucide-react';
 export function NotFound() {
   return (
     <>
-      <Seo title="Page Not Found | MD Abidi Arthritis Institute" />
+      <Seo
+        title="Page Not Found | MD Abidi Arthritis Institute"
+        description="The page you requested could not be found on the MD Abidi Arthritis Institute website."
+        noindex
+        includeOrganization={false}
+      />
       <section className="bg-white">
         <div className="container-page py-24 sm:py-32 text-center">
           <div className="text-7xl font-bold text-primary-600 font-serif">404</div>

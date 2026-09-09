@@ -21,6 +21,9 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
         env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
       ),
+      'import.meta.env.VITE_PUBLIC_SITE_URL': JSON.stringify(
+        env.VITE_PUBLIC_SITE_URL || process.env.VITE_PUBLIC_SITE_URL || 'https://dr-md-abidi.vercel.app'
+      ),
     },
     resolve: {
       alias: {

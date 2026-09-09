@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { site } from '@/data/site';
 import { supabase, supabaseReady } from '@/lib/supabase';
+import { Seo } from '@/components/common/Seo';
 
 const FEATURE_CARDS = [
   { title: 'Pending → Approved', body: 'Every booking request lands as Pending until you confirm it.', icon: CalendarDays, color: '#3b82f6', bg: '#eff6ff' },
@@ -79,6 +80,12 @@ export function AdminLogin({ onReady }: { onReady: () => void }) {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2" style={{ background: '#f8fafc' }}>
+      <Seo
+        title="Admin Sign In | MD Abidi Arthritis Institute"
+        description="Secure admin sign-in for MD Abidi Arthritis Institute."
+        noindex
+        includeOrganization={false}
+      />
       <div className="flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-16">
         <div className="max-w-md w-full mx-auto">
           <div className="bg-white rounded-2xl px-4 py-3 inline-block mb-8 border border-slate-100 shadow-sm">

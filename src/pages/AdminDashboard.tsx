@@ -1096,6 +1096,7 @@ export function AdminDashboard() {
   if (!sessionReady) {
     return (
       <div className="min-h-screen grid place-items-center bg-slate-50">
+        <Seo title="Admin | MD Abidi Arthritis Institute" description="Admin dashboard." noindex includeOrganization={false} />
         <Loader2 className="w-8 h-8 animate-spin text-primary-900"/>
       </div>
     );
@@ -1104,7 +1105,7 @@ export function AdminDashboard() {
 
   return (
     <>
-      <Seo title="Admin | MD Abidi Arthritis Institute" description="Admin dashboard."/>
+      <Seo title="Admin | MD Abidi Arthritis Institute" description="Admin dashboard." noindex includeOrganization={false} />
       <div className="flex h-screen overflow-hidden" style={{ background: '#f1f5f9' }}>
         <Sidebar page={page} setPage={setPage} counts={counts} onLogout={handleLogout}/>
 

@@ -79,47 +79,39 @@ export function Header() {
                     <div className="absolute -left-16 top-full pt-2 opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200 z-[9999]">
                       <div className="bg-white rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,0.16)] border border-ink-100 p-4 w-[540px]">
                         <div className="grid grid-cols-2 gap-4">
-                          {/* Column 1: Official Brochure Packages */}
-                          <div>
-                            
-                            <div className="space-y-0.5">
-                              {item.children
-                                .filter((c) => BROCHURE_SLUGS.has(getSlug(c.href)))
-                                .map((child) => (
-                                  <Link
-                                    key={child.href}
-                                    to={child.href}
-                                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                                      isActive(child.href)
-                                        ? 'text-primary-900 bg-primary-50 font-bold'
-                                        : 'text-ink-800 hover:text-primary-900 hover:bg-primary-50/70 font-medium'
-                                    }`}
-                                  >
-                                    {child.label}
-                                  </Link>
-                                ))}
-                            </div>
+                          <div className="space-y-0.5">
+                            {item.children
+                              .filter((c) => BROCHURE_SLUGS.has(getSlug(c.href)))
+                              .map((child) => (
+                                <Link
+                                  key={child.href}
+                                  to={child.href}
+                                  className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                                    isActive(child.href)
+                                      ? 'text-primary-900 bg-primary-50 font-bold'
+                                      : 'text-ink-800 hover:text-primary-900 hover:bg-primary-50/70 font-medium'
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              ))}
                           </div>
-
-                          {/* Column 2: Specialized & Other Packages */}
-                          <div className="border-l border-ink-100 pl-4">
-                            <div className="space-y-0.5">
-                              {item.children
-                                .filter((c) => !BROCHURE_SLUGS.has(getSlug(c.href)))
-                                .map((child) => (
-                                  <Link
-                                    key={child.href}
-                                    to={child.href}
-                                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                                      isActive(child.href)
-                                        ? 'text-primary-900 bg-primary-50 font-bold'
-                                        : 'text-ink-600 hover:text-primary-900 hover:bg-primary-50/70 font-normal'
-                                    }`}
-                                  >
-                                    {child.label}
-                                  </Link>
-                                ))}
-                            </div>
+                          <div className="border-l border-ink-100 pl-4 space-y-0.5">
+                            {item.children
+                              .filter((c) => !BROCHURE_SLUGS.has(getSlug(c.href)))
+                              .map((child) => (
+                                <Link
+                                  key={child.href}
+                                  to={child.href}
+                                  className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                                    isActive(child.href)
+                                      ? 'text-primary-900 bg-primary-50 font-bold'
+                                      : 'text-ink-600 hover:text-primary-900 hover:bg-primary-50/70 font-normal'
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              ))}
                           </div>
                         </div>
                       </div>
@@ -186,14 +178,32 @@ export function Header() {
           >
             <div className="absolute inset-0 bg-ink-950/40" onClick={() => setOpen(false)} />
             <motion.nav
-              className="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-white shadow-lift overflow-y-auto pt-20 pb-6"
+              className="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-white shadow-lift overflow-y-auto pb-6"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               aria-label="Mobile navigation"
             >
-              <div className="px-5 space-y-1">
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-white border-b border-ink-100 px-5 py-3">
+                <Link to="/" className="flex items-center" aria-label={site.name} onClick={() => setOpen(false)}>
+                  <img
+                    src={site.logo}
+                    alt="MD Abidi Arthritis Institute logo"
+                    className="h-10 w-auto"
+                    loading="eager"
+                  />
+                </Link>
+                <button
+                  type="button"
+                  className="grid place-items-center w-10 h-10 rounded-lg text-ink-800 hover:bg-ink-50"
+                  aria-label="Close menu"
+                  onClick={() => setOpen(false)}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="px-5 pt-3 space-y-1">
                 {nav.map((item) => (
                   <div key={item.href}>
                     {item.children ? (
@@ -218,54 +228,19 @@ export function Header() {
                               exit={{ height: 0, opacity: 0 }}
                               transition={{ duration: 0.25 }}
                             >
-                              {item.href === '/iv-packages/' ? (
-                                <div className="space-y-3 pt-1">
-                                  <div>
-                                    <div className="px-3 py-1 text-[10px] font-bold text-primary-900 uppercase tracking-wider bg-primary-50 rounded mb-1">Official Brochure Packages</div>
-                                    {item.children
-                                      .filter((c) => BROCHURE_SLUGS.has(getSlug(c.href)))
-                                      .map((child) => (
-                                        <Link
-                                          key={child.href}
-                                          to={child.href}
-                                          className={`block px-3 py-2 rounded-lg text-sm ${
-                                            isActive(child.href) ? 'text-primary-700 bg-primary-50 font-bold' : 'text-ink-800 hover:bg-primary-50/60 font-medium'
-                                          }`}
-                                        >
-                                          {child.label}
-                                        </Link>
-                                      ))}
-                                  </div>
-                                  <div>
-                                    <div className="px-3 py-1 text-[10px] font-bold text-ink-500 uppercase tracking-wider bg-ink-50 rounded mb-1">Specialized & Other</div>
-                                    {item.children
-                                      .filter((c) => !BROCHURE_SLUGS.has(getSlug(c.href)))
-                                      .map((child) => (
-                                        <Link
-                                          key={child.href}
-                                          to={child.href}
-                                          className={`block px-3 py-2 rounded-lg text-sm ${
-                                            isActive(child.href) ? 'text-primary-700 bg-primary-50 font-medium' : 'text-ink-600 hover:bg-primary-50/60'
-                                          }`}
-                                        >
-                                          {child.label}
-                                        </Link>
-                                      ))}
-                                  </div>
-                                </div>
-                              ) : (
-                                item.children.map((child) => (
-                                  <Link
-                                    key={child.href}
-                                    to={child.href}
-                                    className={`block px-3 py-2.5 rounded-lg text-sm ${
-                                      isActive(child.href) ? 'text-primary-700 bg-primary-50 font-medium' : 'text-ink-600 hover:bg-primary-50/60'
-                                    }`}
-                                  >
-                                    {child.label}
-                                  </Link>
-                                ))
-                              )}
+                              {item.children.map((child) => (
+                                <Link
+                                  key={child.href}
+                                  to={child.href}
+                                  className={`block px-3 py-2.5 rounded-lg text-sm ${
+                                    isActive(child.href)
+                                      ? 'text-primary-700 bg-primary-50 font-medium'
+                                      : 'text-ink-600 hover:bg-primary-50/60'
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              ))}
                             </motion.div>
                           )}
                         </AnimatePresence>

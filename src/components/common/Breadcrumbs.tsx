@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import { absoluteUrl, removeJsonLd, upsertJsonLd } from '@/lib/seo';
 
 export interface Crumb {
   label: string;
@@ -8,6 +10,36 @@ export interface Crumb {
 
 export function Breadcrumbs({ items }: { items: Crumb[] }) {
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    const key = JSON.stringify(items);
+    const parsed = JSON.parse(key) as Crumb[];
+    const elements = [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: absoluteUrl('/'),
+      },
+      ...parsed.map((item, i) => {
+        const isLast = i === parsed.length - 1;
+        const entry: Record<string, unknown> = {
+          '@type': 'ListItem',
+          position: i + 2,
+          name: item.label,
+        };
+        if (item.href && !isLast) entry.item = absoluteUrl(item.href);
+        return entry;
+      }),
+    ];
+    upsertJsonLd('seo-jsonld-breadcrumb', {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: elements,
+    });
+    return () => removeJsonLd('seo-jsonld-breadcrumb');
+  }, [items]);
+
   return (
     <nav aria-label="Breadcrumb" className="container-page pt-6">
       <ol className="flex flex-wrap items-center gap-1.5 text-sm text-ink-500">

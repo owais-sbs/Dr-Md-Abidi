@@ -5,6 +5,7 @@ import { ContactInfo } from '@/components/contact/ContactInfo';
 import { ContactForm } from '@/components/contact/ContactForm';
 import { site } from '@/data/site';
 import { fadeUp, staggerContainer, viewport } from '@/animations/variants';
+import { SITE_URL } from '@/lib/seo';
 
 const heroImg = 'https://images.pexels.com/photos/6129444/pexels-photo-6129444.jpeg?auto=compress&cs=tinysrgb&h=900&w=1600';
 
@@ -14,6 +15,14 @@ export function Contact() {
       <Seo
         title="Contact Us | MD Abidi Arthritis Institute"
         description="Contact MD Abidi Arthritis Institute in Brick and Freehold, NJ. Call 732-840-8402 or email admin@mdabidi.com to schedule an appointment."
+        path="/contact-us/"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'ContactPage',
+          name: 'Contact Us | MD Abidi Arthritis Institute',
+          description: 'Contact MD Abidi Arthritis Institute in Brick and Freehold, NJ.',
+          mainEntity: { '@id': `${SITE_URL}/#clinic` },
+        }}
       />
       <PageHero
         eyebrow="Get In Touch"
