@@ -85,14 +85,21 @@ export function otpEmail(code: string): { subject: string; html: string; text: s
 
 export function requestReceivedEmail(d: {
   name: string; packageName: string; date: string; time: string; location: string; id: string;
+  serviceKind?: 'iv' | 'condition';
 }): { subject: string; html: string; text: string } {
-  const subject = `We received your IV Therapy booking request`;
+  const isCondition = d.serviceKind === 'condition';
+  const label = isCondition ? 'Service' : 'Package';
+  const kindLabel = isCondition ? 'consultation' : 'IV Therapy';
+  const subject = isCondition
+    ? 'We received your consultation booking request'
+    : 'We received your IV Therapy booking request';
   const html = layout(subject, `
     <h1 style="margin:0 0 16px;font-size:22px;color:#142657;">Request received</h1>
     <p>Hello ${d.name},</p>
-    <p>Thank you for requesting an IV Therapy appointment. This is <strong>not a confirmation</strong> yet. Dr. Abidi will review your intake form and we will email you once a decision is made.</p>
+    <p>Thank you for requesting a ${kindLabel} appointment. This is <strong>not a confirmation</strong> yet. Dr. Abidi will review your request and we will email you once a decision is made.</p>
     ${detailsTable([
-      ['Package', d.packageName],
+      [label, d.packageName],
+      ['Type', isCondition ? 'Conditions We Treat — Consultation' : 'IV Therapy Package'],
       ['Date', formatLongDate(d.date)],
       ['Time', d.time],
       ['Location', `${d.location}, NJ`],
@@ -102,60 +109,73 @@ export function requestReceivedEmail(d: {
     <p>If you have questions, call us at ${CLINIC.phone}.</p>
     <p>Regards,<br/><strong>${CLINIC.name}</strong><br/>${CLINIC.tagline}</p>
   `);
-  const text = `Hello ${d.name}, we received your IV Therapy request (${d.id}) for ${d.packageName} on ${formatLongDate(d.date)} at ${d.time} in ${d.location}. Status: pending doctor review. — ${CLINIC.name}`;
+  const text = `Hello ${d.name}, we received your ${kindLabel} request (${d.id}) for ${d.packageName} on ${formatLongDate(d.date)} at ${d.time} in ${d.location}. Status: pending doctor review. — ${CLINIC.name}`;
   return { subject, html, text };
 }
 
 export function approvedEmail(d: {
   name: string; packageName: string; date: string; time: string; location: string; id: string;
+  serviceKind?: 'iv' | 'condition';
 }): { subject: string; html: string; text: string } {
-  const subject = 'Your IV Therapy Appointment Has Been Confirmed';
+  const isCondition = d.serviceKind === 'condition';
+  const label = isCondition ? 'Service' : 'Package';
+  const kindLabel = isCondition ? 'consultation' : 'IV Therapy';
+  const subject = isCondition
+    ? 'Your Consultation Appointment Has Been Confirmed'
+    : 'Your IV Therapy Appointment Has Been Confirmed';
   const address = CLINIC.locations[d.location] || `${d.location}, NJ`;
   const html = layout(subject, `
     <p style="margin:0 0 12px;font-size:13px;color:#15803d;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Appointment confirmed</p>
     <h1 style="margin:0 0 16px;font-size:22px;color:#142657;">We're pleased to confirm your visit</h1>
     <p>Hello ${d.name},</p>
-    <p>We're pleased to confirm that your IV Therapy appointment has been approved.</p>
+    <p>We're pleased to confirm that your ${kindLabel} appointment has been approved.</p>
     ${detailsTable([
-      ['Package', d.packageName],
+      [label, d.packageName],
+      ['Type', isCondition ? 'Conditions We Treat — Consultation' : 'IV Therapy Package'],
       ['Date', formatLongDate(d.date)],
       ['Time', d.time],
       ['Location', address],
       ['Appointment ID', d.id],
     ])}
     <p style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;font-size:13px;color:#9a3412;">
-      <strong>Please arrive at the scheduled time.</strong> Eat a light meal, drink water beforehand, and bring a photo ID. If you feel unwell, contact the clinic before your visit.
+      <strong>Please arrive at the scheduled time.</strong> ${isCondition ? 'Bring a photo ID and any relevant medical records.' : 'Eat a light meal, drink water beforehand, and bring a photo ID. If you feel unwell, contact the clinic before your visit.'}
     </p>
     <p>If you have any questions, please contact our team at ${CLINIC.phone} or ${CLINIC.email}.</p>
     <p>Regards,<br/><strong>${CLINIC.name}</strong><br/>${CLINIC.tagline}</p>
   `);
-  const text = `Hello ${d.name}, your IV Therapy appointment is confirmed. Package: ${d.packageName}. Date: ${formatLongDate(d.date)}. Time: ${d.time}. Location: ${address}. Appointment ID: ${d.id}. Please arrive on time. — ${CLINIC.name}`;
+  const text = `Hello ${d.name}, your ${kindLabel} appointment is confirmed. ${label}: ${d.packageName}. Date: ${formatLongDate(d.date)}. Time: ${d.time}. Location: ${address}. Appointment ID: ${d.id}. Please arrive on time. — ${CLINIC.name}`;
   return { subject, html, text };
 }
 
 export function rejectedEmail(d: {
   name: string; packageName: string; date: string; time: string; location: string; id: string; reason?: string;
+  serviceKind?: 'iv' | 'condition';
 }): { subject: string; html: string; text: string } {
-  const subject = 'Update on your IV Therapy appointment request';
+  const isCondition = d.serviceKind === 'condition';
+  const label = isCondition ? 'Service' : 'Package';
+  const kindLabel = isCondition ? 'consultation' : 'IV Therapy';
+  const subject = isCondition
+    ? 'Update on your consultation appointment request'
+    : 'Update on your IV Therapy appointment request';
   const reasonBlock = d.reason
     ? `<p style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:14px;font-size:13px;color:#9f1239;"><strong>Note from the clinic:</strong> ${d.reason}</p>`
     : '';
   const html = layout(subject, `
     <h1 style="margin:0 0 16px;font-size:22px;color:#142657;">Update on your request</h1>
     <p>Hello ${d.name},</p>
-    <p>Thank you for your interest in IV Therapy at ${CLINIC.name}. After clinical review, we are unable to approve the requested appointment at this time.</p>
+    <p>Thank you for your interest in ${kindLabel} at ${CLINIC.name}. After review, we are unable to approve the requested appointment at this time.</p>
     ${detailsTable([
-      ['Package', d.packageName],
+      [label, d.packageName],
       ['Requested date', formatLongDate(d.date)],
       ['Requested time', d.time],
       ['Location', `${d.location}, NJ`],
       ['Request ID', d.id],
     ])}
     ${reasonBlock}
-    <p>This decision is based on clinical review of the information provided. You are welcome to contact our office if you would like to discuss other options or request a different time.</p>
+    <p>You are welcome to contact our office if you would like to discuss other options or request a different time.</p>
     <p>Phone: ${CLINIC.phone}<br/>Email: ${CLINIC.email}</p>
     <p>Regards,<br/><strong>${CLINIC.name}</strong><br/>${CLINIC.tagline}</p>
   `);
-  const text = `Hello ${d.name}, we are unable to approve your IV Therapy request (${d.id}) for ${d.packageName} on ${formatLongDate(d.date)} at ${d.time}.${d.reason ? ` Note: ${d.reason}` : ''} Please contact ${CLINIC.phone} if you have questions. — ${CLINIC.name}`;
+  const text = `Hello ${d.name}, we are unable to approve your ${kindLabel} request (${d.id}) for ${d.packageName} on ${formatLongDate(d.date)} at ${d.time}.${d.reason ? ` Note: ${d.reason}` : ''} Please contact ${CLINIC.phone} if you have questions. — ${CLINIC.name}`;
   return { subject, html, text };
 }

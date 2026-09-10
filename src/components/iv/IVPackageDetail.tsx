@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Plus, ArrowRight, Star, CalendarDays, Phone, Shield, Clock, Zap, ChevronDown } from 'lucide-react';
@@ -10,6 +10,8 @@ import { site } from '@/data/site';
 import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
 import { useCmsRealtime } from '@/lib/cmsLive';
 import { absoluteUrl } from '@/lib/seo';
+import { SoftImage } from '@/components/common/SoftImage';
+import { isPackageHiddenFromPublic } from '@/lib/ivPackageVisibility';
 
 export interface Ingredient { abbr: string; name: string; description: string; dosage?: string; }
 export interface AddOn { name: string; price: string; description: string; }
@@ -49,13 +51,17 @@ export function IVPackageDetail({
   const [ov, setOv] = useState<CmsIVPackage | undefined>();
 
   function loadOverride() {
-    getCmsIVPackages().then(list => {
-      setOv(list.find(p => p.id === `static-pkg-${slug}`));
+    getCmsIVPackages().then((list) => {
+      setOv(list.find((p) => p.id === `static-pkg-${slug}`));
     }).catch(() => setOv(undefined));
   }
 
   useEffect(() => { loadOverride(); }, [slug]);
   useCmsRealtime(loadOverride);
+
+  if (ov && isPackageHiddenFromPublic(ov)) {
+    return <Navigate to="/iv-packages/" replace />;
+  }
 
   const name        = ov?.name        || nameProp;
   const price       = ov?.price       || priceProp;
@@ -214,14 +220,14 @@ export function IVPackageDetail({
                       background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 40%, #f0f9ff 100%)',
                     }}
                   >
-                    <motion.img
+                    <SoftImage
                       key={image}
                       src={image}
                       alt={`${name} IV therapy bag`}
-                      className="relative w-full h-full object-contain object-center z-10 p-4"
                       loading="eager"
-                      animate={{ scale: [1, 1.03, 1] }}
-                      transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                      fetchPriority="high"
+                      className="relative w-full h-full z-10"
+                      imgClassName="w-full h-full object-contain object-center p-4"
                     />
                   </div>
 
@@ -421,7 +427,13 @@ export function IVPackageDetail({
                   <div className="card h-full overflow-hidden group hover:shadow-card transition-shadow">
                   <div className="flex items-center justify-center h-44 overflow-hidden bg-sky-50"
                     style={{ background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 50%, #f0f9ff 100%)' }}>
-                    <img src={r.image} alt={r.name} className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    <SoftImage
+                      src={r.image}
+                      alt={r.name}
+                      loading="lazy"
+                      className="w-full h-full"
+                      imgClassName="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
+                    />
                   </div>
                   <div className="p-5">
                     <div className="flex justify-between items-start mb-2">

@@ -8,6 +8,7 @@ import { Breadcrumbs } from '@/components/common/Breadcrumbs';
 import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
 import { fadeUp, staggerContainer, staggerFast, scaleIn, viewport } from '@/animations/variants';
 import { site } from '@/data/site';
+import { SoftImage } from '@/components/common/SoftImage';
 
 export function CmsIVPackageDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -116,10 +117,19 @@ export function CmsIVPackageDetail() {
             <motion.div variants={scaleIn} initial="hidden" animate="visible" transition={{ delay: 0.2 }} className="order-1 lg:order-2 flex justify-center">
               <div className="relative w-full max-w-[400px]">
                 <div className="rounded-3xl overflow-hidden shadow-card border border-ink-100">
-                  <div className="flex items-center justify-center h-72 overflow-hidden"
+                  <div className="flex items-center justify-center h-72 overflow-hidden relative"
                     style={{ background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 40%, #f0f9ff 100%)' }}>
                     {pkg.image
-                      ? <img src={pkg.image} alt={pkg.name} className="w-full h-full object-contain object-center p-4" loading="eager" />
+                      ? (
+                        <SoftImage
+                          src={pkg.image}
+                          alt={pkg.name}
+                          loading="eager"
+                          fetchPriority="high"
+                          className="w-full h-full"
+                          imgClassName="w-full h-full object-contain object-center p-4"
+                        />
+                      )
                       : <div className="w-full h-full flex items-center justify-center text-sky-400 text-4xl">💉</div>
                     }
                   </div>

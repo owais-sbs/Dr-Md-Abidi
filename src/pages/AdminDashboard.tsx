@@ -35,6 +35,7 @@ import { clinicForDate } from '@/lib/cmsLive';
 import { reviewBooking } from '@/lib/bookingApi';
 import { AdminBlogPanel, AdminSettingsPanel } from '@/components/admin/AdminExtraPanels';
 import { adminConfirm, adminError, adminSuccess, adminToast } from '@/lib/adminSwal';
+import { IV_DELETED_TAG, rememberDeletedSlug } from '@/lib/ivPackageVisibility';
 
 /* ─── Types ─────────────────────────────── */
 type NavPage = 'overview' | 'appointments' | 'calendar' | 'slots' | 'messages' | 'conditions' | 'iv-packages' | 'blog' | 'settings';
@@ -204,12 +205,20 @@ function ApptBadge({ status }: { status: AppointmentStatus }) {
 }
 
 /* ─── APPOINTMENT ROW ───────────────────── */
+function resolveServiceKind(appt: Appointment): 'iv' | 'condition' {
+  if (appt.serviceKind === 'condition' || appt.serviceKind === 'iv') return appt.serviceKind;
+  if (String(appt.intake?.serviceKind || '') === 'condition') return 'condition';
+  return 'iv';
+}
+
 function ApptRow({ appt, expanded, onToggle, onAction }: {
   appt: Appointment; expanded: boolean;
   onToggle: () => void;
   onAction: (id: string, patch: Partial<Appointment>) => void;
 }) {
   const [notes, setNotes] = useState(appt.adminNotes || '');
+  const kind = resolveServiceKind(appt);
+  const isCondition = kind === 'condition';
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden transition-shadow hover:shadow-md" style={{ border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -222,6 +231,13 @@ function ApptRow({ appt, expanded, onToggle, onAction }: {
           <div className="text-[10px] text-ink-400 font-mono">{appt.id}</div>
         </div>
         <ApptBadge status={appt.status} />
+        <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+          isCondition
+            ? 'bg-violet-50 text-violet-700 border-violet-200'
+            : 'bg-sky-50 text-sky-700 border-sky-200'
+        }`}>
+          {isCondition ? 'Consultation' : 'IV Package'}
+        </span>
         <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-ink-500 flex-1">
           <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3 text-sky-400"/>{fmtDate(appt.date)} · {appt.time}</span>
           <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-sky-400"/>{appt.location}</span>
@@ -245,17 +261,18 @@ function ApptRow({ appt, expanded, onToggle, onAction }: {
           <motion.div initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} exit={{height:0,opacity:0}} transition={{duration:0.28}} className="overflow-hidden">
             <div className="border-t border-ink-100 bg-ink-50/50 p-5">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><FileText className="w-4 h-4" style={{ color: '#1d4ed8' }}/>Patient Intake Form</h4>
+                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><FileText className="w-4 h-4" style={{ color: '#1d4ed8' }}/>{isCondition ? 'Consultation Details' : 'Patient Intake Form'}</h4>
                 <button onClick={onToggle} className="text-ink-400 hover:text-ink-700 w-6 h-6 flex items-center justify-center rounded-full hover:bg-ink-100 transition-all"><X className="w-3.5 h-3.5"/></button>
               </div>
               <div className="grid sm:grid-cols-3 gap-2.5 mb-3">
-                {[['Full Name',`${appt.firstName} ${appt.lastName}`],['Email',appt.email],['Phone',appt.phone],['Date of Birth',appt.dob],['Gender',appt.gender],['Email verified',appt.emailVerified?'Yes':'No']].map(([l,v])=>(
+                {[['Full Name',`${appt.firstName} ${appt.lastName}`],['Email',appt.email],['Phone',appt.phone],['Date of Birth',appt.dob],['Gender',appt.gender],['Type', isCondition ? 'Conditions We Treat' : 'IV Package'],['Email verified',appt.emailVerified?'Yes':'No']].map(([l,v])=>(
                   <div key={l} className="bg-white rounded-xl p-3 border border-ink-100">
                     <div className="text-[10px] text-ink-400 uppercase tracking-wider mb-0.5">{l}</div>
                     <div className="font-semibold text-ink-800 text-xs">{v||'—'}</div>
                   </div>
                 ))}
               </div>
+              {!isCondition && (
               <div className="grid sm:grid-cols-2 gap-2.5 mb-4">
                 {[['Allergies',appt.allergies],['Medications',appt.medications],['Medical History',appt.medicalHistory],['Reason / Goal',appt.reasonForVisit]].map(([l,v])=>(
                   <div key={l} className="bg-white rounded-xl p-3 border border-ink-100">
@@ -264,6 +281,13 @@ function ApptRow({ appt, expanded, onToggle, onAction }: {
                   </div>
                 ))}
               </div>
+              )}
+              {isCondition && (
+                <div className="bg-white rounded-xl p-3 border border-ink-100 mb-4">
+                  <div className="text-[10px] text-ink-400 uppercase tracking-wider mb-0.5">Service</div>
+                  <div className="text-xs text-ink-700 leading-relaxed">{appt.packageName} — Consultation</div>
+                </div>
+              )}
               {/* Admin notes */}
               <div className="bg-white rounded-xl border border-ink-200 p-3 mb-4">
                 <div className="flex items-center gap-1.5 mb-2">
@@ -1178,6 +1202,7 @@ export function AdminDashboard() {
       if (pkg.id !== staticId) {
         try { await deleteCmsIVPackageHard(staticId, pkg.slug); } catch { /* optional */ }
       }
+      rememberDeletedSlug(pkg.slug);
       setDelConfirm(null);
       setEditingPkg(null);
       // Optimistic UI: drop from local state immediately
@@ -1218,7 +1243,7 @@ export function AdminDashboard() {
         price: existing?.price ?? p.price,
         badge: '',
         image: '',
-        tagline: '__DELETED__',
+        tagline: IV_DELETED_TAG,
         description: '',
         dosages: '',
         bestFor: '',
@@ -1228,6 +1253,7 @@ export function AdminDashboard() {
         createdAt: existing?.createdAt || now,
         updatedAt: now,
       });
+      rememberDeletedSlug(p.slug);
       setDelConfirm(null);
       setEditingPkg(null);
       setIVPackages((prev) => {
@@ -1241,7 +1267,7 @@ export function AdminDashboard() {
             price: p.price,
             badge: '',
             image: '',
-            tagline: '__DELETED__',
+            tagline: IV_DELETED_TAG,
             description: '',
             dosages: '',
             bestFor: '',
@@ -1334,6 +1360,10 @@ export function AdminDashboard() {
     const stableId = `static-pkg-${p.slug}`;
     const now = new Date().toISOString();
     try {
+      if (existing?.tagline === IV_DELETED_TAG) {
+        await adminError('Package deleted', 'This package was permanently deleted and cannot be reactivated.');
+        return;
+      }
       if (existing) {
         await saveCmsIVPackage({ ...existing, enabled: !existing.enabled, updatedAt: now });
         await adminToast(existing.enabled ? 'Moved to draft' : 'Package activated', 'success');
@@ -1684,7 +1714,7 @@ export function AdminDashboard() {
                     {staticIVPackages.filter(p => {
                       const existing = ivPackages.find(x => x.id === `static-pkg-${p.slug}` || x.slug === p.slug);
                       // Deleted packages disappear from the admin list entirely
-                      return existing?.tagline !== '__DELETED__';
+                      return existing?.tagline !== IV_DELETED_TAG;
                     }).map(p=>{
                       const stableId=`static-pkg-${p.slug}`;
                       const existing=ivPackages.find(x=>x.id===stableId || x.slug===p.slug);
@@ -1717,11 +1747,11 @@ export function AdminDashboard() {
                     })}
                   </div>
                 </div>
-                {ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== '__DELETED__').length>0&&(
+                {ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== IV_DELETED_TAG).length>0&&(
                   <div>
-                    <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2 mt-4">Custom ({ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== '__DELETED__').length})</p>
+                    <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2 mt-4">Custom ({ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== IV_DELETED_TAG).length})</p>
                     <div className="grid gap-2">
-                      {ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== '__DELETED__').map(p=>(
+                      {ivPackages.filter(p=>!p.id.startsWith('static-') && p.tagline !== IV_DELETED_TAG).map(p=>(
                         <div key={p.id} className="bg-white rounded-xl border border-ink-100 p-4 flex items-center gap-4 shadow-soft">
                           {p.image&&<img src={p.image} alt={p.name} className="w-10 h-10 rounded-xl object-cover bg-sky-50 shrink-0"/>}
                           <div className="flex-1 min-w-0">

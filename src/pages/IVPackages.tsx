@@ -9,46 +9,63 @@ import { CTASection } from '@/components/common/CTASection';
 import { IV_PACKAGES, IV_ADD_ONS, IV_PACKAGE_DEALS } from '@/data/ivPackages';
 import { getCmsIVPackages, type CmsIVPackage } from '@/data/cms';
 import { useCmsRealtime } from '@/lib/cmsLive';
+import { SoftImage } from '@/components/common/SoftImage';
+import {
+  collectHiddenPackageSlugs,
+  findStaticPackageOverride,
+  IV_DELETED_TAG,
+  publicCustomPackages,
+} from '@/lib/ivPackageVisibility';
 
 const heroImg = 'https://images.pexels.com/photos/3683056/pexels-photo-3683056.jpeg?auto=compress&cs=tinysrgb&h=900&w=1600';
 
 export function IVPackages() {
-  const [overridePkgs, setOverridePkgs] = useState<CmsIVPackage[]>([]);
+  const [cmsPkgs, setCmsPkgs] = useState<CmsIVPackage[]>([]);
 
   async function loadCms() {
     try {
-      const all = await getCmsIVPackages();
-      setOverridePkgs(all.filter(p => p.id.startsWith('static-pkg-')));
+      setCmsPkgs(await getCmsIVPackages());
     } catch {
-      setOverridePkgs([]);
+      setCmsPkgs([]);
     }
   }
 
   useEffect(() => {
-    loadCms();
+    void loadCms();
   }, []);
   useCmsRealtime(loadCms);
 
-  const hiddenSlugs = new Set(
-    overridePkgs.filter(p => !p.enabled || p.tagline === '__DELETED__').map(p => p.slug),
-  );
+  const hiddenSlugs = collectHiddenPackageSlugs(cmsPkgs);
 
-  const displayPackages = IV_PACKAGES
-    .filter(p => !hiddenSlugs.has(p.slug))
-    .map(p => {
-    const ov = overridePkgs.find(o => o.enabled && (o.slug === p.slug || o.id === `static-pkg-${p.slug}`));
-    if (!ov) return p;
-    return {
-      ...p,
-      slug: ov.slug || p.slug,
-      name: ov.name || p.name,
-      price: ov.price || p.price,
-      totalValue: ov.totalValue ?? p.totalValue,
-      badge: ov.badge || p.badge,
-      image: ov.image || p.image,
-      description: ov.description || p.description,
-    };
-  });
+  const displayPackages = [
+    ...IV_PACKAGES
+      .filter((p) => !hiddenSlugs.has(p.slug))
+      .map((p) => {
+        const ov = findStaticPackageOverride(cmsPkgs, p.slug);
+        if (!ov || !ov.enabled || ov.tagline === IV_DELETED_TAG) return p;
+        return {
+          ...p,
+          slug: ov.slug || p.slug,
+          name: ov.name || p.name,
+          price: ov.price || p.price,
+          totalValue: ov.totalValue ?? p.totalValue,
+          badge: ov.badge || p.badge,
+          image: ov.image || p.image,
+          description: ov.description || p.description,
+        };
+      }),
+    ...publicCustomPackages(cmsPkgs).map((p) => ({
+      name: p.name,
+      price: p.price,
+      totalValue: p.totalValue,
+      badge: p.badge || undefined,
+      image: p.image || '/power-up.jpg',
+      description: p.description || '',
+      includes: [] as string[],
+      slug: p.slug,
+      category: undefined as string | undefined,
+    })),
+  ];
 
   return (
     <>
@@ -107,11 +124,12 @@ export function IVPackages() {
                 <div className="card h-full flex flex-col hover:shadow-card transition-shadow">
                   <div className="relative aspect-[4/3] overflow-hidden bg-sky-50 flex items-center justify-center"
                     style={{ background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 50%, #f0f9ff 100%)' }}>
-                    <img
+                    <SoftImage
                       src={pkg.image}
                       alt={pkg.name}
                       loading="lazy"
-                      className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full"
+                      imgClassName="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
                     />
                     {pkg.badge && (
                       <span className="absolute top-4 left-4 inline-flex items-center gap-1 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-700 shadow-sm">

@@ -62,7 +62,7 @@ async function slotIsOpen(date: string, time: string, location: string): Promise
 async function insertAppointment(row: Record<string, unknown>) {
   const first = await supabaseAdmin().from('appointments').insert(row);
   if (!first.error) return first;
-  if (!/email_verified|approved_at|rejected_at|rejection_reason|schema cache/i.test(first.error.message)) {
+  if (!/email_verified|approved_at|rejected_at|rejection_reason|service_kind|schema cache/i.test(first.error.message)) {
     return first;
   }
   const fallback = {
@@ -86,7 +86,10 @@ async function insertAppointment(row: Record<string, unknown>) {
     reason_for_visit: row.reason_for_visit,
     status: 'pending',
     admin_notes: row.admin_notes,
-    intake: row.intake,
+    intake: {
+      ...(typeof row.intake === 'object' && row.intake ? row.intake as Record<string, unknown> : {}),
+      serviceKind: row.service_kind || 'iv',
+    },
   };
   return supabaseAdmin().from('appointments').insert(fallback);
 }
@@ -109,12 +112,15 @@ export async function handleCreateAppointment(body: unknown): Promise<ApiResult>
   const firstName = str(p.firstName, 80);
   const lastName = str(p.lastName, 80);
   const phone = str(p.phone, 40);
+  const kindRaw = str(p.serviceKind || p.kind, 20).toLowerCase();
+  const serviceKind = kindRaw === 'condition' ? 'condition' : 'iv';
 
-  if (!packageName || !packageSlug) return fail('Please select an IV package.');
+  if (!packageName || !packageSlug) return fail('Please select a service or IV package.');
   if (location !== 'Freehold' && location !== 'Brick') return fail('Please choose a valid location.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail('Please choose a valid date.');
   if (!TIME_SLOTS.includes(time)) return fail('Please choose a valid time.');
   if (!firstName || !phone) return fail('Name and phone are required.');
+  if (serviceKind === 'condition' && !str(p.dob, 40)) return fail('Date of birth is required.');
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -125,11 +131,13 @@ export async function handleCreateAppointment(body: unknown): Promise<ApiResult>
   if (slotError) return fail(slotError);
 
   const id = generateId();
-  const intake = p.intake && typeof p.intake === 'object' ? p.intake : {};
+  const intakeBase = p.intake && typeof p.intake === 'object' ? (p.intake as Record<string, unknown>) : {};
+  const intake = { ...intakeBase, serviceKind };
   const row = {
     id,
     package_name: packageName,
     package_slug: packageSlug,
+    service_kind: serviceKind,
     location,
     date,
     time,
@@ -141,10 +149,12 @@ export async function handleCreateAppointment(body: unknown): Promise<ApiResult>
     gender: str(p.gender, 40),
     address: str(p.address, 200),
     insurance_name: str(p.insuranceName, 120),
-    allergies: str(p.allergies, 500),
-    medications: str(p.medications, 500),
-    medical_history: str(p.medicalHistory, 1000),
-    reason_for_visit: str(p.reasonForVisit, 1000),
+    allergies: serviceKind === 'condition' ? '' : str(p.allergies, 500),
+    medications: serviceKind === 'condition' ? '' : str(p.medications, 500),
+    medical_history: serviceKind === 'condition' ? '' : str(p.medicalHistory, 1000),
+    reason_for_visit: serviceKind === 'condition'
+      ? `Consultation: ${packageName}`
+      : str(p.reasonForVisit, 1000),
     status: 'pending',
     admin_notes: '',
     intake,
@@ -162,13 +172,21 @@ export async function handleCreateAppointment(body: unknown): Promise<ApiResult>
 
   const name = [firstName, lastName].filter(Boolean).join(' ') || 'there';
   try {
-    const mail = requestReceivedEmail({ name, packageName, date, time, location, id });
+    const mail = requestReceivedEmail({
+      name,
+      packageName,
+      date,
+      time,
+      location,
+      id,
+      serviceKind,
+    });
     await sendMail({ to: email, ...mail });
   } catch (err) {
     console.error('[appointments] request-received email failed', err instanceof Error ? err.message : err);
   }
 
-  return ok({ id, status: 'pending' }, 201);
+  return ok({ id, status: 'pending', serviceKind }, 201);
 }
 
 export async function handleReviewAppointment(
@@ -216,6 +234,9 @@ export async function handleReviewAppointment(
   }
 
   const name = [appt.first_name, appt.last_name].filter(Boolean).join(' ') || 'there';
+  const intake = (appt.intake && typeof appt.intake === 'object') ? appt.intake as Record<string, unknown> : {};
+  const kindRaw = String(appt.service_kind || intake.serviceKind || '').toLowerCase();
+  const serviceKind = kindRaw === 'condition' ? 'condition' as const : 'iv' as const;
   const details = {
     name,
     packageName: String(appt.package_name || ''),
@@ -224,6 +245,7 @@ export async function handleReviewAppointment(
     location: String(appt.location || ''),
     id,
     reason: action === 'reject' ? reason : undefined,
+    serviceKind,
   };
 
   let emailSent = true;

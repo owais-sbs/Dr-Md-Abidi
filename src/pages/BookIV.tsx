@@ -15,6 +15,12 @@ import { getCmsIVPackages, getCmsConditions } from '@/data/cms';
 import { supabase, supabaseReady } from '@/lib/supabase';
 import { createBookingRequest, sendBookingOtp, verifyBookingOtp } from '@/lib/bookingApi';
 import { LegalConsentCheckbox } from '@/components/common/LegalConsentCheckbox';
+import {
+  collectHiddenPackageSlugs,
+  findStaticPackageOverride,
+  IV_DELETED_TAG,
+  publicCustomPackages,
+} from '@/lib/ivPackageVisibility';
 
 type BookableService = {
   key: string;
@@ -37,14 +43,19 @@ function resolvePreselected(params: URLSearchParams): string {
 /* ─────────────────────────────────────────────
    STEP SIDEBAR
 ───────────────────────────────────────────── */
-const STEPS = [
-  { num: 1, label: 'Choose Service',  sub: 'Select a treatment or IV package' },
-  { num: 2, label: 'Choose Slot',     sub: 'Pick date, location & time' },
-  { num: 3, label: 'Verify Email',    sub: 'OTP confirmation' },
-  { num: 4, label: 'Medical Form',    sub: 'Patient intake & history' },
-];
+function bookingSteps(kind?: 'iv' | 'condition') {
+  return [
+    { num: 1, label: 'Choose Service', sub: 'Select a treatment or IV package' },
+    { num: 2, label: 'Choose Slot', sub: 'Pick date, location & time' },
+    { num: 3, label: 'Verify Email', sub: 'OTP confirmation' },
+    kind === 'condition'
+      ? { num: 4, label: 'Patient Details', sub: 'Name, phone, DOB & gender' }
+      : { num: 4, label: 'Medical Form', sub: 'IV intake & history' },
+  ];
+}
 
-function Sidebar({ current }: { current: number }) {
+function Sidebar({ current, kind }: { current: number; kind?: 'iv' | 'condition' }) {
+  const STEPS = bookingSteps(kind);
   return (
     <aside className="hidden lg:flex flex-col gap-0 w-64 shrink-0">
       <div className="bg-primary-900 rounded-2xl p-6 text-white sticky top-8">
@@ -88,7 +99,8 @@ function Sidebar({ current }: { current: number }) {
 }
 
 /* mobile step bar */
-function MobileSteps({ current }: { current: number }) {
+function MobileSteps({ current, kind }: { current: number; kind?: 'iv' | 'condition' }) {
+  const STEPS = bookingSteps(kind);
   return (
     <div className="lg:hidden flex items-center justify-center gap-2 mb-6">
       {STEPS.map((s, i) => (
@@ -125,24 +137,22 @@ export function BookIV() {
     try {
       const [pkgs, conds] = await Promise.all([getCmsIVPackages(), getCmsConditions()]);
 
-      const deletedPkgSlugs = new Set(
-        pkgs.filter((p) => !p.enabled || p.tagline === '__DELETED__').map((p) => p.slug),
-      );
-      const pkgOverrides = pkgs.filter(p => p.enabled && p.id.startsWith('static-pkg-') && p.tagline !== '__DELETED__');
-      const cmsPkgs = pkgs.filter(p => p.enabled && !p.id.startsWith('static-pkg-') && p.tagline !== '__DELETED__');
+      const deletedPkgSlugs = collectHiddenPackageSlugs(pkgs);
+      const cmsPkgs = publicCustomPackages(pkgs);
       const ivServices: BookableService[] = [
-        ...IV_PACKAGES.filter(p => !deletedPkgSlugs.has(p.slug)).map(p => {
-          const ov = pkgOverrides.find(o => o.slug === p.slug || o.id === `static-pkg-${p.slug}`);
+        ...IV_PACKAGES.filter((p) => !deletedPkgSlugs.has(p.slug)).map((p) => {
+          const ov = findStaticPackageOverride(pkgs, p.slug);
+          const useOv = ov && ov.enabled && ov.tagline !== IV_DELETED_TAG;
           return {
-            key: `iv:${ov?.slug || p.slug}`,
+            key: `iv:${useOv ? ov.slug : p.slug}`,
             kind: 'iv' as const,
-            slug: ov?.slug || p.slug,
-            name: ov?.name || p.name,
-            price: ov?.price ?? p.price,
+            slug: useOv ? ov.slug : p.slug,
+            name: useOv ? ov.name : p.name,
+            price: useOv ? ov.price : p.price,
             category: 'IV Therapy Package',
           };
         }),
-        ...cmsPkgs.map(p => ({
+        ...cmsPkgs.map((p) => ({
           key: `iv:${p.slug}`,
           kind: 'iv' as const,
           slug: p.slug,
@@ -152,11 +162,11 @@ export function BookIV() {
         })),
       ];
 
-      const condOverrides = conds.filter(c => c.id.startsWith('static-cond-'));
-      const cmsConds = conds.filter(c => c.enabled && !c.id.startsWith('static-cond-'));
+      const condOverrides = conds.filter((c) => c.id.startsWith('static-cond-'));
+      const cmsConds = conds.filter((c) => c.enabled && !c.id.startsWith('static-cond-'));
       const conditionServices: BookableService[] = [
-        ...staticConditions.flatMap(c => {
-          const ov = condOverrides.find(o => o.slug === c.slug || o.id === `static-cond-${c.slug}`);
+        ...staticConditions.flatMap((c) => {
+          const ov = condOverrides.find((o) => o.slug === c.slug || o.id === `static-cond-${c.slug}`);
           if (ov && !ov.enabled) return [];
           return [{
             key: `condition:${ov?.slug || c.slug}`,
@@ -166,7 +176,7 @@ export function BookIV() {
             category: 'Conditions We Treat',
           }];
         }),
-        ...cmsConds.map(c => ({
+        ...cmsConds.map((c) => ({
           key: `condition:${c.slug}`,
           kind: 'condition' as const,
           slug: c.slug,
@@ -178,14 +188,14 @@ export function BookIV() {
       setServices([...conditionServices, ...ivServices]);
     } catch {
       setServices([
-        ...staticConditions.map(c => ({
+        ...staticConditions.map((c) => ({
           key: `condition:${c.slug}`,
           kind: 'condition' as const,
           slug: c.slug,
           name: c.title,
           category: 'Conditions We Treat',
         })),
-        ...IV_PACKAGES.map(p => ({
+        ...IV_PACKAGES.filter((p) => !collectHiddenPackageSlugs([]).has(p.slug)).map((p) => ({
           key: `iv:${p.slug}`,
           kind: 'iv' as const,
           slug: p.slug,
@@ -405,7 +415,9 @@ export function BookIV() {
         sessionStorage.setItem('iv-verify-token', result.verificationToken);
         sessionStorage.setItem('iv-verify-email', result.email || email);
       } catch { /* ignore */ }
-      setOtpInfo('Email verified. Continue to the medical form.');
+      setOtpInfo(pkgObj?.kind === 'condition'
+        ? 'Email verified. Continue to patient details.'
+        : 'Email verified. Continue to the medical form.');
       setStep(3);
     } catch (err) {
       setOtpError(err instanceof Error ? err.message : 'Could not verify the code.');
@@ -433,10 +445,12 @@ export function BookIV() {
       return;
     }
     const names = form.name.trim().split(/\s+/);
+    const isCondition = pkgObj?.kind === 'condition';
     try {
       const result = await createBookingRequest({
         verificationToken: token,
         email,
+        serviceKind: isCondition ? 'condition' : 'iv',
         packageName: pkgObj?.name || '',
         packageSlug: pkgObj?.slug || selectedPkg,
         location: slotObj?.location || 'Freehold',
@@ -447,20 +461,23 @@ export function BookIV() {
         phone: form.phone,
         dob: form.dob,
         gender: form.gender,
-        allergies: form.allergies,
-        medications: form.medications,
-        medicalHistory: form.conditions.join(', '),
-        reasonForVisit: form.treatmentGoal,
-        intake: {
-          priorIV: form.priorIV,
-          priorIVDetail: form.priorIVDetail,
-          priorIVProblems: form.priorIVProblems,
-          dialysis: form.dialysis,
-          digoxin: form.digoxin,
-          africanDescentG6PD: form.africanDescentG6PD,
-          decreasedGFR: form.decreasedGFR,
-          decreasedGFRDetail: form.decreasedGFRDetail,
-        },
+        allergies: isCondition ? '' : form.allergies,
+        medications: isCondition ? '' : form.medications,
+        medicalHistory: isCondition ? '' : form.conditions.join(', '),
+        reasonForVisit: isCondition ? `Consultation: ${pkgObj?.name || ''}` : form.treatmentGoal,
+        intake: isCondition
+          ? { serviceKind: 'condition' }
+          : {
+              serviceKind: 'iv',
+              priorIV: form.priorIV,
+              priorIVDetail: form.priorIVDetail,
+              priorIVProblems: form.priorIVProblems,
+              dialysis: form.dialysis,
+              digoxin: form.digoxin,
+              africanDescentG6PD: form.africanDescentG6PD,
+              decreasedGFR: form.decreasedGFR,
+              decreasedGFRDetail: form.decreasedGFRDetail,
+            },
       });
       setSavedId(result.id);
       try { sessionStorage.removeItem('iv-verify-token'); sessionStorage.removeItem('iv-verify-email'); } catch { /* ignore */ }
@@ -512,11 +529,11 @@ export function BookIV() {
           {step < 4 ? (
             <div className="flex gap-8 items-start">
               {/* Sidebar */}
-              <Sidebar current={step} />
+              <Sidebar current={step} kind={pkgObj?.kind} />
 
               {/* Main card */}
               <div ref={stepCardRef} className="flex-1 min-w-0 scroll-mt-36">
-                <MobileSteps current={step} />
+                <MobileSteps current={step} kind={pkgObj?.kind} />
                 <AnimatePresence mode="wait">
 
                   {/* ══ STEP 0: Package ══ */}
@@ -701,7 +718,7 @@ export function BookIV() {
                     </motion.div>
                   )}
 
-                  {/* ══ STEP 3: Medical Intake Form ══ */}
+                  {/* ══ STEP 3: Patient form (condition) or IV medical intake ══ */}
                   {step === 3 && (
                     <motion.div key="s3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
                       <form onSubmit={handleSubmit}>
@@ -726,10 +743,11 @@ export function BookIV() {
                         </div>
 
                         <div className="bg-white rounded-2xl shadow-soft border border-ink-100 overflow-hidden">
-                          {/* Form header */}
                           <div className="border-b border-ink-100 px-5 sm:px-8 py-5 flex items-center justify-between">
                             <div>
-                              <h2 className="text-base sm:text-lg font-serif font-bold text-ink-900">IV Hydration Medical History Form</h2>
+                              <h2 className="text-base sm:text-lg font-serif font-bold text-ink-900">
+                                {pkgObj?.kind === 'condition' ? 'Consultation Patient Details' : 'IV Hydration Medical History Form'}
+                              </h2>
                               <p className="text-xs text-ink-500 mt-0.5">Date: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                             </div>
                             <div className="text-right text-xs text-ink-500">
@@ -740,7 +758,7 @@ export function BookIV() {
 
                           <div className="p-5 sm:p-8 space-y-8">
 
-                            {/* ── Basic Info ── */}
+                            {/* Shared basics — always shown */}
                             <div className="grid sm:grid-cols-2 gap-6">
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Full Name <span className="text-red-400">*</span></label>
@@ -749,6 +767,10 @@ export function BookIV() {
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Phone Number <span className="text-red-400">*</span></label>
                                 <input required type="tel" inputMode="numeric" pattern="[0-9]*" autoComplete="tel" value={form.phone} onChange={e => setF('phone', e.target.value.replace(/\D/g, '').slice(0, 15))} placeholder="7328408402" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-ink-700 mb-1.5">Email</label>
+                                <input type="email" value={email} readOnly className="w-full border-b-2 border-ink-200 px-0 py-2 text-sm outline-none bg-transparent text-ink-600" />
                               </div>
                               <div>
                                 <label className="block text-xs font-semibold text-ink-700 mb-1.5">Date of Birth <span className="text-red-400">*</span></label>
@@ -761,16 +783,23 @@ export function BookIV() {
                                   <option>Male</option><option>Female</option><option>Non-binary</option><option>Prefer not to say</option>
                                 </select>
                               </div>
-                              <div className="sm:col-span-2">
-                                <label className="block text-xs font-semibold text-ink-700 mb-1.5">Allergies</label>
-                                <input type="text" value={form.allergies} onChange={e => setF('allergies', e.target.value)} placeholder="List any known allergies, or 'None'" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
-                              </div>
-                              <div className="sm:col-span-2">
-                                <label className="block text-xs font-semibold text-ink-700 mb-1.5">Current Medications</label>
-                                <input type="text" value={form.medications} onChange={e => setF('medications', e.target.value)} placeholder="List current medications, or 'None'" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
-                              </div>
+                              {pkgObj?.kind !== 'condition' && (
+                                <>
+                                  <div className="sm:col-span-2">
+                                    <label className="block text-xs font-semibold text-ink-700 mb-1.5">Allergies</label>
+                                    <input type="text" value={form.allergies} onChange={e => setF('allergies', e.target.value)} placeholder="List any known allergies, or 'None'" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <label className="block text-xs font-semibold text-ink-700 mb-1.5">Current Medications</label>
+                                    <input type="text" value={form.medications} onChange={e => setF('medications', e.target.value)} placeholder="List current medications, or 'None'" className="w-full border-b-2 border-ink-300 focus:border-primary-900 px-0 py-2 text-sm outline-none transition-colors bg-transparent" />
+                                  </div>
+                                </>
+                              )}
                             </div>
 
+                            {/* IV-only medical questionnaire */}
+                            {pkgObj?.kind !== 'condition' && (
+                              <>
                             <hr className="border-ink-200" />
 
                             {/* ── Q1 ── */}
@@ -867,10 +896,12 @@ export function BookIV() {
                             </div>
 
                             <hr className="border-ink-200" />
+                              </>
+                            )}
 
                             {/* ── Disclaimer ── */}
                             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 leading-relaxed">
-                              <strong>Please note:</strong> This is a <strong>booking request</strong>, not a confirmed appointment. Dr. Abidi will review your medical history form and approve or decline it in the admin portal. Approved times appear on the clinic calendar.
+                              <strong>Please note:</strong> This is a <strong>booking request</strong>, not a confirmed appointment. Dr. Abidi will review your {pkgObj?.kind === 'condition' ? 'details' : 'medical history form'} and approve or decline it in the admin portal. Approved times appear on the clinic calendar.
                             </div>
 
                             {submitError && (
@@ -905,7 +936,7 @@ export function BookIV() {
                 </div>
                 <h2 className="text-2xl font-serif font-bold text-ink-900 mb-2">Request Received!</h2>
                 <p className="text-ink-500 leading-relaxed max-w-md mx-auto mb-6">
-                  Thank you, <strong>{form.name.split(' ')[0]}</strong>. Your booking request has been submitted. Dr. Abidi will review your intake form and confirm your appointment via email.
+                  Thank you, <strong>{form.name.split(' ')[0]}</strong>. Your {pkgObj?.kind === 'condition' ? 'consultation' : 'booking'} request has been submitted. Dr. Abidi will review your {pkgObj?.kind === 'condition' ? 'details' : 'intake form'} and confirm your appointment via email.
                 </p>
                 <div className="bg-ink-50 border border-ink-100 rounded-xl p-5 mb-6 text-left space-y-2 text-sm">
                   <div className="flex flex-col xs:flex-row xs:justify-between gap-1">

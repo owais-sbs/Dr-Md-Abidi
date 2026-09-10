@@ -233,8 +233,11 @@ CREATE POLICY slots_admin_all ON public.slot_configs
 
 DROP POLICY IF EXISTS conditions_public_read ON public.cms_conditions;
 CREATE POLICY conditions_public_read ON public.cms_conditions
-  FOR SELECT TO anon
-  USING (enabled = true);
+  FOR SELECT TO anon, authenticated
+  USING (
+    enabled = true
+    OR id LIKE 'static-cond-%'
+  );
 
 DROP POLICY IF EXISTS conditions_admin_all ON public.cms_conditions;
 CREATE POLICY conditions_admin_all ON public.cms_conditions
@@ -244,8 +247,12 @@ CREATE POLICY conditions_admin_all ON public.cms_conditions
 
 DROP POLICY IF EXISTS packages_public_read ON public.cms_iv_packages;
 CREATE POLICY packages_public_read ON public.cms_iv_packages
-  FOR SELECT TO anon
-  USING (enabled = true);
+  FOR SELECT TO anon, authenticated
+  USING (
+    enabled = true
+    OR id LIKE 'static-pkg-%'
+    OR tagline = '__DELETED__'
+  );
 
 DROP POLICY IF EXISTS packages_admin_all ON public.cms_iv_packages;
 CREATE POLICY packages_admin_all ON public.cms_iv_packages

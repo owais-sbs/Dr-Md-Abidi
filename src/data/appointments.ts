@@ -8,6 +8,7 @@ export interface Appointment {
   id: string;
   packageName: string;
   packageSlug: string;
+  serviceKind?: 'iv' | 'condition';
   location: 'Freehold' | 'Brick';
   date: string;
   time: string;
@@ -86,10 +87,13 @@ function localIsoDate(d: Date): string {
 }
 
 function rowToAppointment(row: Record<string, unknown>): Appointment {
+  const kindRaw = String(row.service_kind ?? '').toLowerCase();
+  const serviceKind = kindRaw === 'condition' ? 'condition' as const : kindRaw === 'iv' ? 'iv' as const : undefined;
   return {
     id: String(row.id),
     packageName: String(row.package_name ?? ''),
     packageSlug: String(row.package_slug ?? ''),
+    serviceKind,
     location: (row.location === 'Brick' ? 'Brick' : 'Freehold'),
     date: asDate(row.date as string),
     time: String(row.time ?? ''),
@@ -122,6 +126,7 @@ function appointmentToRow(appt: Appointment) {
     id: appt.id,
     package_name: appt.packageName,
     package_slug: appt.packageSlug,
+    service_kind: appt.serviceKind || 'iv',
     location: appt.location,
     date: appt.date,
     time: appt.time,
