@@ -28,7 +28,7 @@ const features = [
 export function JointHealthSection() {
   return (
     <section className="bg-white">
-      <div className="container-page py-12 sm:py-20">
+      <div className="container-page py-12 sm:py-16">
         <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={viewport} className="max-w-2xl mx-auto text-center">
           <motion.span variants={fadeDown} className="eyebrow">Why Arthritis &amp; Joint Health Matters</motion.span>
           <motion.h2 variants={fadeUp} className="mt-3 text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-ink-900 text-balance">Don't Delay Arthritis &amp; Joint Pain Treatment</motion.h2>

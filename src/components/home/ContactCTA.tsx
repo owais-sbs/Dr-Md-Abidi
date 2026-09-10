@@ -10,7 +10,7 @@ export function ContactCTA() {
       <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-white/10 blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-orange-400/20 blur-3xl -translate-x-1/3 translate-y-1/3 pointer-events-none" />
 
-      <div className="container-page relative py-12 sm:py-20">
+      <div className="container-page relative py-12 sm:py-16">
         <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={viewport} className="max-w-2xl">
           <motion.span variants={fadeUp} className="eyebrow text-white/90">
             Get In Touch

@@ -19,7 +19,7 @@ const points = [
 export function AboutSection() {
   return (
     <section className="bg-white overflow-hidden">
-      <div className="container-page py-12 sm:py-20">
+      <div className="container-page py-12 sm:py-16">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
 
           {/* Image column */}

@@ -9,7 +9,7 @@ import { blogPosts } from '@/data/blogPosts';
 export function BlogSection() {
   return (
     <section className="bg-ink-50">
-      <div className="container-page py-20">
+      <div className="container-page pt-12 sm:pt-14 pb-14 sm:pb-16">
 
         <motion.div
           variants={staggerContainer}

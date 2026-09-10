@@ -301,18 +301,52 @@ function MsgRow({ msg, expanded, onToggle, onStatus }: {
 }) {
   return (
     <div className={`bg-white rounded-2xl border shadow-soft overflow-hidden hover:shadow-card transition-shadow ${msg.status==='new'?'border-violet-200':'border-ink-100'}`}>
-      <div className="px-5 py-4 flex flex-wrap items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white flex items-center justify-center font-bold text-sm shrink-0">{(msg.name?.[0]||'?').toUpperCase()}</div>
-        <div className="min-w-[140px]"><div className="font-bold text-ink-900 text-sm">{msg.name}</div><div className="text-xs text-ink-400">{msg.email}</div></div>
-        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${MSG_STATUS[msg.status].bg} ${MSG_STATUS[msg.status].border} ${MSG_STATUS[msg.status].text}`}>{MSG_STATUS[msg.status].label}</span>
-        <div className="flex-1 text-xs text-ink-500 truncate max-w-xs">{msg.message}</div>
-        {msg.phone && <span className="flex items-center gap-1 text-xs text-ink-400"><Phone className="w-3 h-3"/>{msg.phone}</span>}
-        <div className="text-[10px] text-ink-400 shrink-0">{fmtTs(msg.createdAt)}</div>
+      <div className="px-5 py-4 flex items-start gap-3">
+        {/* Avatar */}
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+          {(msg.name?.[0]||'?').toUpperCase()}
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-bold text-ink-900 text-sm">{msg.name}</span>
+            <span className="text-xs text-ink-400">{msg.email}</span>
+            <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border ${MSG_STATUS[msg.status].bg} ${MSG_STATUS[msg.status].border} ${MSG_STATUS[msg.status].text}`}>
+              {MSG_STATUS[msg.status].label}
+            </span>
+          </div>
+          <p className="text-xs text-ink-500 mt-1 truncate">{msg.message}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+            {msg.phone && <span className="flex items-center gap-1 text-xs text-ink-400"><Phone className="w-3 h-3"/>{msg.phone}</span>}
+            <span className="text-[10px] text-ink-400">{fmtTs(msg.createdAt)}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {msg.status!=='replied' && <button onClick={()=>onStatus(msg.id,'replied')} className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full">Mark Replied</button>}
-          {msg.status!=='read'    && <button onClick={()=>onStatus(msg.id,'read')}    className="h-7 px-3 text-[11px] font-bold bg-ink-200 hover:bg-ink-300 text-ink-700 rounded-full">Mark Read</button>}
-          <button onClick={onToggle} className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-primary-900 rounded-full transition-all text-ink-500">
-            {expanded?<ChevronUp className="w-3.5 h-3.5"/>:<Eye className="w-3.5 h-3.5"/>}
+          {msg.status !== 'replied' && (
+            <button
+              onClick={() => onStatus(msg.id, 'replied')}
+              className="h-7 px-3 text-[11px] font-bold bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors"
+            >
+              Replied
+            </button>
+          )}
+          {msg.status !== 'read' && (
+            <button
+              onClick={() => onStatus(msg.id, 'read')}
+              className="h-7 px-3 text-[11px] font-semibold border border-ink-200 hover:border-ink-400 text-ink-600 rounded-full transition-colors"
+            >
+              Read
+            </button>
+          )}
+          <button
+            onClick={onToggle}
+            className="h-7 w-7 flex items-center justify-center border border-ink-200 hover:border-primary-900 rounded-full transition-all text-ink-500"
+            title={expanded ? 'Collapse' : 'View message'}
+          >
+            {expanded ? <ChevronUp className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
           </button>
         </div>
       </div>

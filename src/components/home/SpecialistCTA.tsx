@@ -12,7 +12,7 @@ export function SpecialistCTA() {
     <section className="relative overflow-hidden bg-ink-950 text-white">
       <div className="absolute inset-0 opacity-25" style={{ backgroundImage: `url(${bgImg})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
       <div className="absolute inset-0 bg-gradient-to-r from-ink-950/95 via-ink-950/85 to-primary-900/60" />
-      <div className="container-page relative py-20">
+      <div className="container-page relative py-14 sm:py-16">
         <motion.div
           variants={staggerContainer}
           initial="hidden"

@@ -105,32 +105,34 @@ export function IVPackages() {
                 className="group h-full"
               >
                 <div className="card h-full flex flex-col hover:shadow-card transition-shadow">
-                  <div className="relative aspect-[16/10] overflow-hidden bg-sky-50">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-sky-50 flex items-center justify-center"
+                    style={{ background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 50%, #f0f9ff 100%)' }}>
                     <img
                       src={pkg.image}
                       alt={pkg.name}
                       loading="lazy"
-                      className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-ink-950/60 via-transparent to-transparent" />
                     {pkg.badge && (
                       <span className="absolute top-4 left-4 inline-flex items-center gap-1 rounded-full bg-white/90 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-700 shadow-sm">
                         <Star className="w-3 h-3 fill-current" />
                         {pkg.badge}
                       </span>
                     )}
-                    <div className="absolute bottom-4 left-4 text-white">
-                      <div className="text-2xl font-black">${pkg.price}</div>
-                      {pkg.totalValue && (
-                        <div className="text-xs text-white/80 line-through">Value ${pkg.totalValue}</div>
-                      )}
-                    </div>
                   </div>
 
                   <div className="p-5 flex flex-col flex-1">
-                    <h3 className="text-lg font-bold text-ink-900 group-hover:text-primary-700 transition-colors">
-                      {pkg.name}
-                    </h3>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className="text-lg font-bold text-ink-900 group-hover:text-primary-700 transition-colors">
+                        {pkg.name}
+                      </h3>
+                      <div className="text-right shrink-0">
+                        <div className="text-xl font-black text-primary-900">${pkg.price}</div>
+                        {pkg.totalValue && (
+                          <div className="text-xs text-ink-400 line-through">Value ${pkg.totalValue}</div>
+                        )}
+                      </div>
+                    </div>
                     <p className="mt-2 text-sm text-ink-600 leading-relaxed line-clamp-3">
                       {pkg.description}
                     </p>

@@ -44,7 +44,7 @@ export function ConditionsSection() {
   });
   return (
     <section className="bg-ink-50">
-      <div className="container-page py-20">
+      <div className="container-page py-14 sm:py-16">
 
         <motion.div
           variants={staggerContainer}

@@ -18,7 +18,7 @@ export function Newsletter() {
 
   return (
     <section className="bg-ink-50">
-      <div className="container-page py-16 sm:py-20">
+      <div className="container-page pt-12 sm:pt-14 pb-0">
         <motion.div
           variants={staggerContainer}
           initial="hidden"

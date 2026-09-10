@@ -8,7 +8,7 @@ import { testimonials } from '@/data/testimonials';
 export function TestimonialsSection() {
   return (
     <section className="bg-white overflow-hidden">
-      <div className="container-page py-20">
+      <div className="container-page py-14 sm:py-16">
         <motion.div
           variants={staggerContainer}
           initial="hidden"
@@ -40,7 +40,7 @@ export function TestimonialsSection() {
         initial="hidden"
         whileInView="visible"
         viewport={viewport}
-        className="mt-10 text-center container-page pb-20"
+        className="mt-10 text-center container-page pb-8"
       >
         <Link to="/happy-patients/" className="btn-ghost">
           Read More Patient Stories

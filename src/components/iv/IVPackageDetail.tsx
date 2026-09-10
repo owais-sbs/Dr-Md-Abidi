@@ -209,15 +209,16 @@ export function IVPackageDetail({
                 <div className="rounded-3xl overflow-hidden shadow-card border border-ink-100">
                   {/* Blue water-splash bg area */}
                   <div
-                    className="relative h-72 overflow-hidden"
+                    className="relative flex items-center justify-center h-72 overflow-hidden"
                     style={{
                       background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 40%, #f0f9ff 100%)',
                     }}
                   >
                     <motion.img
+                      key={image}
                       src={image}
                       alt={`${name} IV therapy bag`}
-                      className="absolute inset-0 w-full h-full object-cover object-center z-10"
+                      className="relative w-full h-full object-contain object-center z-10 p-4"
                       loading="eager"
                       animate={{ scale: [1, 1.03, 1] }}
                       transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
@@ -418,8 +419,9 @@ export function IVPackageDetail({
               {related.map(r => (
                 <motion.div key={r.href} variants={scaleIn} className="h-full">
                   <div className="card h-full overflow-hidden group hover:shadow-card transition-shadow">
-                  <div className="relative h-44 overflow-hidden bg-sky-50">
-                    <img src={r.image} alt={r.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                  <div className="flex items-center justify-center h-44 overflow-hidden bg-sky-50"
+                    style={{ background: 'radial-gradient(ellipse at 60% 40%, #dbeafe 0%, #eff6ff 50%, #f0f9ff 100%)' }}>
+                    <img src={r.image} alt={r.name} className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                   </div>
                   <div className="p-5">
                     <div className="flex justify-between items-start mb-2">
